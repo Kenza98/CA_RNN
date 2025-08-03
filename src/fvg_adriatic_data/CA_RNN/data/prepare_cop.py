@@ -1,13 +1,28 @@
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--use-gpu", action="store_true", help="Use GPU for tensor stacking")
+args = parser.parse_args()
+
+use_gpu = args.use_gpu
 import torch
 import os
 from SlidingWindowDs import *
 import xarray as xr
 import gc
 from torch.utils.data import DataLoader
-
-
+import sys
+sys.stdout.flush()
 # preprocessing with batches
-def Dataset_to_pt(ds, output_file, batch_size=256, num_workers=8):
+def Dataset_to_pt(ds, output_file, batch_size=256, num_workers=8, use_gpu=False):
+    device = torch.device("cuda" if (use_gpu and torch.cuda.is_available()) else "cpu")
+    print(f"Using device: {device}")
+    print("CUDA available:", torch.cuda.is_available(), flush=True)
+    if torch.cuda.is_available():
+    	print("GPU name:", torch.cuda.get_device_name(0), flush=True)
+        print("CUDA version:", torch.version.cuda, flush=True)
+    else:
+    	print("No GPU detected. Running on CPU.", flush=True)
     N = len(ds)
     print(N)
     per_nan = 0
@@ -28,7 +43,7 @@ def Dataset_to_pt(ds, output_file, batch_size=256, num_workers=8):
         print("new batch!")
         for sample in batch:
             try:
-                x, y = ds[i]
+                x, y = sample
                 if torch.isnan(x).any() or torch.isnan(y).any():
                     per_nan += 1
                     continue
@@ -46,8 +61,8 @@ def Dataset_to_pt(ds, output_file, batch_size=256, num_workers=8):
         print(f"No valid samples for {output_file}")
         return
 
-    X_tensor = torch.stack(X)
-    Y_tensor = torch.stack(Y)
+    X_tensor = torch.stack(X).to(device)
+    Y_tensor = torch.stack(Y).to(device)
 
     print(f"X shape: {X_tensor.shape}, Y shape: {Y_tensor.shape}")
     dir_name = os.path.dirname(output_file)  # je récup le nom du dossier
@@ -79,7 +94,7 @@ if "depth" in sst_train.dims:
 
 train_ds = SlidingWindowDs(sst_train, seq_length=8)
 
-Dataset_to_pt(train_ds, "training_set.pt", batch_size=256, num_workers=8)
+Dataset_to_pt(train_ds, "training_set.pt", batch_size=256, num_workers=8, use_gpu=use_gpu)
 del sst_train, train_ds, dataset
 gc.collect()
 
@@ -97,7 +112,7 @@ gc.collect()
 test_ds = SlidingWindowDs(sst_test, seq_length=8)
 output_file = "sst_test_set.pt"
 
-Dataset_to_pt(test_ds, output_file, batch_size=256, num_workers=8)
+Dataset_to_pt(test_ds, output_file, batch_size=256, num_workers=8, use_gpu=use_gpu)
 
 del sst_test
 gc.collect()
