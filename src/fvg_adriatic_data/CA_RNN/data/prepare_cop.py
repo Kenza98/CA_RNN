@@ -19,10 +19,11 @@ def Dataset_to_pt(ds, output_file, batch_size=256, num_workers=8, use_gpu=False)
     print(f"Using device: {device}")
     print("CUDA available:", torch.cuda.is_available(), flush=True)
     if torch.cuda.is_available():
-    	print("GPU name:", torch.cuda.get_device_name(0), flush=True)
+        print("GPU name:", torch.cuda.get_device_name(0), flush=True)
         print("CUDA version:", torch.version.cuda, flush=True)
     else:
-    	print("No GPU detected. Running on CPU.", flush=True)
+        print("No GPU detected. Running on CPU.", flush=True)
+        
     N = len(ds)
     print(N)
     per_nan = 0
