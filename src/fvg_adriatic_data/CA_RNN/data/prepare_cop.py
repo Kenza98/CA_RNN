@@ -62,34 +62,32 @@ def Dataset_to_pt(ds, output_file):
 
 
 # use Dask to load data in chunks of 100 time steps.
-dataset = xr.open_dataset("test_year.nc", chunks={"time": 100})
+dataset = xr.open_dataset("train_sst.nc", chunks={"time": 100})
 # time as first dim for easier slicing (!!!)
-sst = dataset["thetao"].transpose("time", "depth", "latitude", "longitude")
+sst_train = dataset["thetao"]
 
 # Define date ranges
-train_start = "2020-05-31"
-train_end = "2022-05-31"
+#train_start = "2020-05-31"
+#train_end = "2022-05-31"
 # select the right data values
-sst_train = sst.sel(time=slice(train_start, train_end))
+#sst_train = sst.sel(depth=sst.depth.values[0])
 # create training Dataset object
 
-# train_ds = SlidingWindowDs(sst_train, seq_length=8)
-
+train_ds = SlidingWindowDs(sst_train, seq_length=8)
+dataset.close()
 # generate pt
-# Dataset_to_pt(train_ds, "training_set.pt")
+Dataset_to_pt(train_ds, "training_set.pt")
+del sst_train, train_ds
+gc.collect()
 
-# del sst_train, train_ds
-# gc.collect()
+#test_start = "2022-06-01"
+#test_end = "2023-05-31"
+dataset = xr.open_dataset("test_sst.nc", chunks={"time": 100})
 
-test_start = "2022-06-01"
-test_end = "2023-05-31"
-print(sst.depth.values[0])
-sst_test = sst.sel(time=slice(test_start, test_end), depth=sst.depth.values[0])
-
-print(sst_test)
+sst_test = dataset["thetao"]
 
 dataset.close()  # done with it
-del dataset, sst
+del dataset
 gc.collect()
 
 test_ds = SlidingWindowDs(sst_test, seq_length=8)
