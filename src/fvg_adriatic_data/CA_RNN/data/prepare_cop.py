@@ -63,30 +63,27 @@ def Dataset_to_pt(ds, output_file):
 
 # use Dask to load data in chunks of 100 time steps.
 dataset = xr.open_dataset("train_sst.nc", chunks={"time": 100})
-# time as first dim for easier slicing (!!!)
 sst_train = dataset["thetao"]
+dataset.close()
+if "depth" in sst_train.dims:
+    sst_train = sst_train.isel(depth=0)
 
-# Define date ranges
-#train_start = "2020-05-31"
-#train_end = "2022-05-31"
-# select the right data values
-#sst_train = sst.sel(depth=sst.depth.values[0])
-# create training Dataset object
 
 train_ds = SlidingWindowDs(sst_train, seq_length=8)
-dataset.close()
-# generate pt
+
+
 Dataset_to_pt(train_ds, "training_set.pt")
-del sst_train, train_ds
+del sst_train, train_ds, dataset
 gc.collect()
 
-#test_start = "2022-06-01"
-#test_end = "2023-05-31"
 dataset = xr.open_dataset("test_sst.nc", chunks={"time": 100})
 
 sst_test = dataset["thetao"]
+dataset.close()
+if "depth" in sst_test.dims:
+    sst_test = sst_test.isel(depth=0)
 
-dataset.close()  # done with it
+
 del dataset
 gc.collect()
 
