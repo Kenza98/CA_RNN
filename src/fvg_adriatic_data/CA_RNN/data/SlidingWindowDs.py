@@ -17,9 +17,9 @@ class SlidingWindowDs(Dataset):
 
         # Extract dimensions
         self.T = self.data.sizes["time"]
-        self.H = self.data.sizes["lat"]
-        self.W = self.data.sizes["lon"]
-        self.F = self.data.sizes["feature"]
+        self.H = self.data.sizes["latitude"]
+        self.W = self.data.sizes["longitude"]
+        # self.F = self.data.sizes["thetao"]
 
     def __len__(self):  # nb of samples in the xr dataset
         return (self.T - self.seq_length - 1) * self.H * self.W
@@ -44,7 +44,7 @@ class SlidingWindowDs(Dataset):
         w_slice = slice(w_idx - 1, w_idx + 2)
 
         # Lazy slice from xarray (Dask-backed)
-        neighborhood = self.data.isel(time=t_slice, lat=h_slice, lon=w_slice)
+        neighborhood = self.data.isel(time=t_slice, latitude=h_slice, longitude=w_slice)
 
         # Convert to torch tensor -> ici quand j'appelle .values, c'est là que ça va load en mémoire pour la première fois
         neighborhood = torch.tensor(neighborhood.values, dtype=torch.float32)
@@ -54,7 +54,7 @@ class SlidingWindowDs(Dataset):
 
         # Target = center pixel at t+seq_length
         target_time = t_idx + self.seq_length
-        target = self.data.isel(time=target_time, lat=h_idx, lon=w_idx)
+        target = self.data.isel(time=target_time, latitude=h_idx, longitude=w_idx)
         target = torch.tensor(target.values, dtype=torch.float32)
 
         return neighborhood, target

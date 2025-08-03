@@ -4,90 +4,98 @@ import numpy as np
 import os
 from SlidingWindowDs import *
 import xarray as xr
-
-# Convert an xarray dataset to a PyTorch tensor.
-
-dataset = xr.open_dataset("data/subset_adriatic_sst.nc")
-time = dataset.time
-surface_temp = dataset["thetao"]
-
-"""
-print("Latitude range:", surface_temp.latitude.min().item(), "to", surface_temp.latitude.max().item())
-print("Longitude range:", surface_temp.longitude.min().item(), "to", surface_temp.longitude.max().item())
-"""
-total_elements = surface_temp.size
-num_nans = np.isnan(surface_temp.values).sum()
-percent_nans = (num_nans / total_elements) * 100
-print(f"Percentage of NaNs in the entire dataset: {percent_nans:.2f}%")
-
-#exit()
-# Quick summary stats from the raw xarray DataArray
-print("Min value:", surface_temp.min().item())
-print("Max value:", surface_temp.max().item())
-print("Mean value:", surface_temp.mean().item())
-print("Number of NaNs:", np.isnan(surface_temp.values).sum())
+import gc
 
 
-tensor_sst = torch.tensor(surface_temp.values, dtype=torch.float32)
-tensor_sst = tensor_sst.squeeze(dim=1)
+# preprocessing pre-tensor
+def Dataset_to_pt(ds, output_file):
+    N = len(ds)
+    print(N)
+    per_nan = 0
+    per_out = 0
+    X, Y = [], []
+    for i in range(len(ds)):
+        try:
+            x, y = ds[i]
+            if torch.isnan(x).any() or torch.isnan(y).any():
+                per_nan += 1
+                continue
+            X.append(x)
+            Y.append(y)
 
-# print(tensor_sst.shape)
-# depth = surface_temp.depth.values
-# min_depth_index = np.argmin(depth)
+        except IndexError:
+            # print(f"Index {i} out of bounds for dataset of length {len(ds)}")
+            per_out += 1
+            continue
 
-# tensor_sst = tensor_temp[:, min_depth_index, :, :]
+        if (i % 10000) in range(10):
+            print(f"step {i} ... {N - i} samples remaining")
+        if i % 100000 in range(10):
+            print(f"Processing data {int(i*100/N)}% complete")
+            print(f"percentage of nan : {int(per_nan * 100 / N)} %")
+            print(f"percentage of out of bound {int(per_out * 100 / N)}%")
 
-tensor_sst = tensor_sst.unsqueeze(-1)  # Add feature dimension at the end
+    if not X:
+        print(f"No valid samples for {output_file}")
+        return
 
-try:
-    output_file = "./data/cop_ml_ready.pt"  # pt file name
-except FileNotFoundError:
-    print("File not found.")
+    X_tensor = torch.stack(X)
+    Y_tensor = torch.stack(Y)
+    print(f"X shape: {X_tensor.shape}, Y shape: {Y_tensor.shape}")
+    dir_name = os.path.dirname(output_file)  # je récup le nom du dossier
+    if dir_name:
+        os.makedirs(dir_name, exist_ok=True)  # only creates new dir if it doesn't exist
+        # exists_ok is True by default in Python 3.2+
+    # create .pt file
+    try:
+        torch.save(
+            {
+                "X": X_tensor,
+                "Y": Y_tensor,
+            },
+            output_file,
+        )
+    except FileNotFoundError:
+        print("File not found. Please check the output .pt file path.")
+    finally:
+        print(f"Dataset saved to {output_file}")
 
 
-full_dataset = SlidingWindowDs(tensor_sst, 8)  # seq_length = 8
+# use Dask to load data in chunks of 100 time steps.
+dataset = xr.open_dataset("test_year.nc", chunks={"time": 100})
+# time as first dim for easier slicing (!!!)
+sst = dataset["thetao"].transpose("time", "depth", "latitude", "longitude")
 
-N = len(full_dataset)
-print(N)
-train_size = int(0.8 * N)
-test_size = N - train_size
-lengths = [train_size, test_size]
-train_dataset, test_dataset = random_split(full_dataset, lengths)
+# Define date ranges
+train_start = "2020-05-31"
+train_end = "2022-05-31"
+# select the right data values
+sst_train = sst.sel(time=slice(train_start, train_end))
+# create training Dataset object
 
-# extract x,y pairs
-X_TRAIN, Y_TRAIN = zip(*[train_dataset[i] for i in range(len(train_dataset))])
-X_TEST, Y_TEST = zip(*[test_dataset[i] for i in range(len(test_dataset))])
+# train_ds = SlidingWindowDs(sst_train, seq_length=8)
 
-X_TEST = torch.stack(X_TEST)
-Y_TEST = torch.stack(Y_TEST)
-X_TRAIN = torch.stack(X_TRAIN)
-Y_TRAIN = torch.stack(Y_TRAIN)
+# generate pt
+# Dataset_to_pt(train_ds, "training_set.pt")
 
-print(X_TRAIN.shape, Y_TRAIN.shape, X_TEST.shape, Y_TEST.shape)
+# del sst_train, train_ds
+# gc.collect()
 
-# save to EXISTING .pt file
-try:
-    pt_file = torch.load(output_file)
-    print("file loaded successfully")
-    pt_file["X_TRAIN"] = X_TRAIN
-    pt_file["Y_TRAIN"] = Y_TRAIN
-    pt_file["X_TEST"] = X_TEST
-    pt_file["Y_TEST"] = Y_TEST
-    torch.save(pt_file, output_file)
+test_start = "2022-06-01"
+test_end = "2023-05-31"
+print(sst.depth.values[0])
+sst_test = sst.sel(time=slice(test_start, test_end), depth=sst.depth.values[0])
 
-except FileNotFoundError:
-    """
-    CASE FIRST TIME CREATING PT FILE
-    """
-    print("Creating new .pt file ... \n ...\n")
-    data_to_save = {
-        "X_TRAIN": X_TRAIN,
-        "Y_TRAIN": Y_TRAIN,
-        "X_TEST": X_TEST,
-        "Y_TEST": Y_TEST,
-    }
+print(sst_test)
 
-    torch.save(data_to_save, output_file)
-print(
-    f"Created sliding window dataset with train size {len(train_dataset)} and test size {len(test_dataset)} samples."
-)
+dataset.close()  # done with it
+del dataset, sst
+gc.collect()
+
+test_ds = SlidingWindowDs(sst_test, seq_length=8)
+output_file = "sst_test_set.pt"
+
+Dataset_to_pt(test_ds, output_file)
+
+del sst_test
+gc.collect()
