@@ -14,6 +14,7 @@ class SlidingWindowDs(Dataset):
         """
         self.data = xr_data
         self.seq_length = seq_length
+        self.global_mean = float(self.data.mean().compute())  # lazy compute once
 
         # Extract dimensions
         self.T = self.data.sizes["time"]
@@ -34,8 +35,38 @@ class SlidingWindowDs(Dataset):
         # to avoid being out of range, raise IndexError if the indices are out of bounds
         # Skip borders: not enough space for neighborhood
         if h_idx < 1 or h_idx >= self.H - 1 or w_idx < 1 or w_idx >= self.W - 1:
-            raise IndexError("Index corresponds to a border pixel, skipping.")
+            # raise IndexError("Index corresponds to a border pixel, skipping.")
+            # Shape: (seq_length, 3, 3
+            seq = np.full((self.seq_length, 3, 3), self.global_mean, dtype=np.float32)
+            t_slice = slice(t_idx, t_idx + self.seq_length)
+            h_min = max(0, h_idx - 1)
+            h_max = min(self.H, h_idx + 2)
+            w_min = max(0, w_idx - 1)
+            w_max = min(self.W, w_idx + 2)
 
+            # Extract valid sub-patch
+            valid_patch = self.data.isel(
+                time=t_slice,
+                latitude=slice(h_min, h_max),
+                longitude=slice(w_min, w_max),
+            ).values.astype(np.float32)
+            # Determine where to insert it inside the 3x3 patch
+            insert_h_start = 1 - (h_idx - h_min)
+            insert_h_end = insert_h_start + valid_patch.shape[1]
+            insert_w_start = 1 - (w_idx - w_min)
+            insert_w_end = insert_w_start + valid_patch.shape[2]
+
+            seq[:, insert_h_start:insert_h_end, insert_w_start:insert_w_end] = (
+                valid_patch
+            )
+            seq = seq.reshape(self.seq_length, -1)
+
+            # Create target (center pixel at final time)
+            target_val = self.data.isel(
+                time=t_idx + self.seq_length, latitude=h_idx, longitude=w_idx
+            ).values.astype(np.float32)
+
+            return torch.tensor(seq), torch.tensor([target_val])
         # Input time slice
         t_slice = slice(t_idx, t_idx + self.seq_length)
 
