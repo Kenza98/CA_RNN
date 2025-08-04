@@ -94,7 +94,7 @@ def build_learning_set_from_xarray(
 
 
 X_train, Y_train = build_learning_set_from_xarray(
-    "src/fvg_adriatic_data/CA_RNN/data/test_sst.nc",
+    "train_sst.nc",
     seq_length=8,
     chunk_size=200,
     use_gpu=True,
@@ -103,4 +103,4 @@ X_train, Y_train = build_learning_set_from_xarray(
 print(f"X shape: {X_train.shape}, Y shape: {Y_train.shape}")
 
 
-torch.save({"X": X_train, "Y": Y_train}, "sst_test_set.pt")
+torch.save({"X": X_train, "Y": Y_train}, "sst_train_set.pt")

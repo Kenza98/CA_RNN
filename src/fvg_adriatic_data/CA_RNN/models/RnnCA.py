@@ -1,4 +1,15 @@
 import torch
+import time
+import argparse
+# Command-line args
+parser = argparse.ArgumentParser()
+parser.add_argument("--use-gpu", action="store_true", help="Use GPU if available")
+args = parser.parse_args()
+
+# Device selection
+device = torch.device("cuda" if (args.use_gpu and torch.cuda.is_available()) else "cpu")
+print(f"Using device: {device}", flush=True)
+
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import random_split, DataLoader, TensorDataset
@@ -7,29 +18,18 @@ import matplotlib.pyplot as plt
 
 
 # "./data/cop_ml_ready.pt"
-load_file = "data/cop_ml_ready.pt"
-data = torch.load(load_file)
+load_file = "../data/sst_train_set.pt"
+data = torch.load(load_file, map_location="cpu")
 
-X, Y = data["X_TRAIN"], data["Y_TRAIN"]
+X= data["X"]
+Y=data["Y"]
 
-X = torch.tensor(X, dtype=torch.float32)
-Y = torch.tensor(Y, dtype=torch.float32)
+#X = torch.tensor(X, dtype=torch.float32)
+#Y = torch.tensor(Y, dtype=torch.float32)
 
-# print(X.ndim, Y.ndim)  # 3, 2
+train_dataset = TensorDataset(X, Y)
 
-nan_mask_X = torch.isnan(X).any(dim=(1, 2))  # Check for NaNs in each sample
-nan_mask_Y = torch.isnan(Y).any(dim=(1))
-
-nan_mask = nan_mask_X | nan_mask_Y
-
-valid_indices = (~nan_mask).nonzero(as_tuple=True)[0]
-# print(valid_indices.shape)
-
-
-X_clean = X[valid_indices]
-Y_clean = Y[valid_indices]
-
-clean_dataset = TensorDataset(X_clean, Y_clean)
+train_loader = DataLoader(train_dataset, batch_size=256, shuffle=True, num_workers=8)
 
 nb_features = 1
 learning_rate = 1e-4
@@ -40,9 +40,8 @@ input_dim = 9
 seq_length = 4
 hidden_dim = 7 * 8
 
-train_loader = DataLoader(clean_dataset, batch_size, shuffle=True)
-    
 model = vrnn.VanillaRNN(input_dim, hidden_dim, output_dim)
+model.to(device)
 criterion = nn.MSELoss()
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 model.train()
@@ -50,15 +49,14 @@ model.train()
 grad_history = {} #store gradient over epoch to plot smt, the log takes time...
 
 for epoch in range(num_epochs):
+    epoch_start = time.time()
+    epoch_loss = 0.0
     for x_batch, y_batch in train_loader:
-        # FOR SEQUENTIAL shape (batch_size, -1) = (batch_size, 9)
-        # print(f"shape of input : {x_batch.shape}\n")
-        # print(f"shape of input : {y_batch.shape}\n")
+        x_batch = x_batch.to(device)
+        y_batch = y_batch.to(device)
 
         optimizer.zero_grad()
         y_pred = model(x_batch)
-        # print(f"The target shape : {y_batch.shape}")
-        # print(f"The output shape : {y_pred.shape}")
 
         loss = criterion(y_pred, y_batch)
         loss.backward() #propagate the gradients
@@ -71,12 +69,28 @@ for epoch in range(num_epochs):
                     if name not in grad_history:
                         grad_history[name] = []
                     grad_history[name].append(grad_norm)
-            
-
 
         optimizer.step()
-    print(f"Epoch {epoch+1}, Loss: {loss.item():.4f}")
+        epoch_loss += loss.item()
+     # Average loss
+     avg_loss = epoch_loss / len(train_loader)
 
+     # GPU memory usage (MB)
+     if device.type == "cuda":
+        mem_alloc = torch.cuda.memory_allocated(device) / 1024**2
+        mem_reserved = torch.cuda.memory_reserved(device) / 1024**2
+     else:
+        mem_alloc = mem_reserved = 0
+
+     epoch_time = time.time() - epoch_start
+
+     print(
+        f"Epoch {epoch+1}/{num_epochs} | "
+        f"Loss: {avg_loss:.4f} | "
+        f"GPU Mem: {mem_alloc:.1f}MB/{mem_reserved:.1f}MB | "
+        f"Time: {epoch_time:.2f}s",
+        flush=True
+     )
 plt.figure(figsize=(10, 6))
 for name, norms in grad_history.items():
     plt.plot(norms, label=name)
