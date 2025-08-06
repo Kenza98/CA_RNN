@@ -4,7 +4,19 @@ from torch.utils.data import TensorDataset, DataLoader
 from torch.utils.tensorboard import SummaryWriter
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 
+
+# Create a unique log directory for this run
+log_dir = os.path.join("runs", f"rnnca_job_{os.environ.get('SLURM_JOB_ID', 'local')}")
+writer = SummaryWriter(log_dir=log_dir)
+print(f"TensorBoard log dir: {log_dir}", flush=True)
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device: {device}", flush=True)
+if device.type == "cuda":
+    print(f"GPU name: {torch.cuda.get_device_name(0)}", flush=True)
+    print(f"CUDA version: {torch.version.cuda}", flush=True)
 
 class VanillaRNN(nn.Module):
     # This method initializes the layers of the model:
@@ -25,43 +37,35 @@ class VanillaRNN(nn.Module):
 
     def forward(self, x):
         out, _ = self.rnn(
-            x
+        x
         )  # out contains the hidden states for each time step in the sequence
         # _ cuz i didn't need the final hidden state. I use the one from last time step at each run
         out = self.fc(out[:, -1, :])  # Use the last hidden state
         return out
 
 
-load_file = "data/cop_ml_ready.pt"
-data = torch.load(load_file)
+load_file = "sst_test_set.pt"
+model_file = "../data/sst_train_set.pt"
 
+
+data = torch.load(load_file, map_location="cpu")
+model_loader = torch.load(model_file, map_location="cpu")
 # recuperate test data
-X_test, Y_test = data["X_TEST"], data["Y_TEST"] #these are not normalized and not nan free
+X, Y = data["X"], data["Y"] #these are not normalized and not nan free
 
-X_test = torch.tensor(X_test, dtype=torch.float32)
-Y_test = torch.tensor(Y_test, dtype=torch.float32)
-
-nan_mask_X = torch.isnan(X_test).any(dim=(1, 2))  # Check for NaNs in each sample
-nan_mask_Y = torch.isnan(Y_test).any(dim=(1))
-nan_mask = nan_mask_X | nan_mask_Y
-
-valid_indices = (~nan_mask).nonzero(as_tuple=True)[0] 
-
-X_test_valid = X_test[valid_indices]
-Y_test_valid = Y_test[valid_indices]
-
-test_dataset = TensorDataset(X_test_valid, Y_test_valid)
+test_dataset = TensorDataset(X, Y)
 
 batch_size = 32
-test_loader = DataLoader(test_dataset, batch_size, shuffle=True)
-
-# Reconstruct the model from memory
 output_dim = 1
 input_dim = 9
 hidden_dim = 7 * 8
 
+test_loader = DataLoader(test_dataset, batch_size, shuffle=True)
+
 model = VanillaRNN(input_dim, hidden_dim, output_dim)
-model.load_state_dict(data["model_state_dict"])
+model.load_state_dict(model_loader["model_state_dict"])
+model = model.to(device)
+
 criterion = nn.MSELoss()
 
 model.eval()
@@ -70,6 +74,8 @@ total_mare = 0
 total_loss = 0
 num_batches = 0
 total_samples = 0
+total_samples_marre = 0
+avg_neighbors = 0
 all_preds = []
 all_targets = []
 
@@ -77,21 +83,31 @@ inf = torch.iinfo(torch.int64).max
 
 with torch.no_grad():
     for batch_seq, batch_tar in test_loader:
+        total_samples += batch_size
+        batch_seq = batch_seq.to(device)
+        batch_tar = batch_tar.to(device)
+        #avg_neighbors = torch.mean(batch_seq, dims=(1,2))
+        print(batch_seq.shape, batch_tar.shape)
         outputs = model(batch_seq)
-        # MSE loss
+        avg_neighbors += torch.mean( torch.abs(outputs - torch.mean(batch_seq, dim=(1,2))))
+        print(f"Average of neighbors : {avg_neighbors/ batch_size} \n Y_pred mean : {outputs/batch_size}")
+        print(f"Baseline error : {avg_neighbors}")
+	# MSE loss
         loss = criterion(outputs, batch_tar)
         total_loss += loss.item()
+        avg_loss = total_loss / total_samples
+        writer.add_scalar("Loss/train", avg_loss)
 
         # MARE loss
         mask = batch_tar > 0.05
+        total_samples_marre += batch_tar[mask].numel()
+
         Aj = torch.abs(batch_tar - outputs)
 
         Pj = torch.abs(batch_tar)
         mare = (
             Aj[mask] / Pj[mask]
-        ).sum()  # does it do the division for all elements in the batch?
-
-        total_samples += batch_tar[mask].numel()
+        ).sum()
         total_mare += mare
         num_batches += 1
         all_preds.append(outputs.cpu())
@@ -106,7 +122,7 @@ data["mare_test_error"] = avg_mare
 
 torch.save(data, load_file)
 
-diff = (len(test_dataset) - total_samples) / len(test_dataset)
+diff = (len(test_dataset) - total_samples) / len(test_dataset) #should yield 0
 print(f"diff = {diff}\n\n")
 print(f"Trial completed with average test MSE loss : {average_loss:.4f}")
 print(f"Trial completed with average test MARE loss : {avg_mare:.4f}")
@@ -131,15 +147,23 @@ print(f"Target Std Dev: {y_std:.4f}")
 writer.add_scalar("stats/test_target_std", y_std)
 writer.add_scalar("stats/test_target_mean", y_mean)
 # to denormalize y_pred_denorm = y_pred * Y_std + Y_mean
-
 #histogram of predictions vs targets
-plt.hist(y_true, bins=50, alpha=0.7, label="Targets")
-plt.hist(y_pred, bins=50, alpha=0.7, label="Predictions")
-plt.legend()
-plt.title("Distribution of Predictions vs Targets")
-plt.xlabel("Value")
-plt.ylabel("Frequency")
-plt.show()
+hist_fig ,hist_ax = plt.subplots(figsize=(12,6))
+
+hist_ax.hist(y_true, bins=50, alpha=0.7, label="Targets")
+hist_ax.hist(y_pred, bins=50, alpha=0.7, label="Predictions")
+hist_ax.legend()
+hist_ax.set_title("Distribution of Predictions vs Targets")
+hist_ax.set_xlabel("Value")
+hist_ax.set_ylabel("Frequency")
+out_dir = os.path.dirname(__file__)
+hist_fig.savefig(os.path.join(out_dir, "hist_pred_vs_target.png"), dpi=150, bbox_inches="tight")
+fig.savefig(os.path.join(out_dir, "zoom_pred_vs_target.png"), dpi=150, bbox_inches="tight")
+
+writer.add_figure("Histogram_Pred_vs_Target", hist_fig)
+plt.close(hist_fig)
+
+
 # Create matplotlib figure
 M = 300
 fig, ax = plt.subplots(figsize=(12, 6))
@@ -149,9 +173,9 @@ ax.set_title("Zoomed-in: First 300 Test Samples")
 ax.set_xlabel("Sample Index")
 ax.set_ylabel("Value")
 ax.legend()
-
-plt.show()
-# Log to TensorBoard
+fig.savefig(os.path.join(out_dir ,"zoom_pred_vs_target.png"), dpi=150, bbox_inches="tight")
 writer.add_figure("Prediction_vs_Target_RNNTest", fig)
+plt.close(fig)
 
+writer.add_figure("Prediction_vs_Target_RNNTest", fig)
 writer.close()
