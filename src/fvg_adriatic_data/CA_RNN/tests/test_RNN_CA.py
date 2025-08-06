@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-
 # Create a unique log directory for this run
 log_dir = os.path.join("runs", f"rnnca_job_{os.environ.get('SLURM_JOB_ID', 'local')}")
 writer = SummaryWriter(log_dir=log_dir)
@@ -17,6 +16,7 @@ print(f"Using device: {device}", flush=True)
 if device.type == "cuda":
     print(f"GPU name: {torch.cuda.get_device_name(0)}", flush=True)
     print(f"CUDA version: {torch.version.cuda}", flush=True)
+
 
 class VanillaRNN(nn.Module):
     # This method initializes the layers of the model:
@@ -37,21 +37,23 @@ class VanillaRNN(nn.Module):
 
     def forward(self, x):
         out, _ = self.rnn(
-        x
+            x
         )  # out contains the hidden states for each time step in the sequence
         # _ cuz i didn't need the final hidden state. I use the one from last time step at each run
         out = self.fc(out[:, -1, :])  # Use the last hidden state
         return out
 
 
-load_file = "sst_test_set.pt"
+# paths
+data_file = "sst_test_set.pt"
 model_file = "../data/sst_train_set.pt"
+output_file = "testset_results.pt"
 
 
-data = torch.load(load_file, map_location="cpu")
+data = torch.load(data_file, map_location="cpu")
 model_loader = torch.load(model_file, map_location="cpu")
 # recuperate test data
-X, Y = data["X"], data["Y"] #these are not normalized and not nan free
+X, Y = data["X"], data["Y"]  # these are not normalized and not nan free
 
 test_dataset = TensorDataset(X, Y)
 
@@ -70,12 +72,13 @@ criterion = nn.MSELoss()
 
 model.eval()
 
+
 total_mare = 0
 total_loss = 0
 num_batches = 0
 total_samples = 0
 total_samples_marre = 0
-avg_neighbors = 0
+avg_neighbors = 0  # for baseline error
 all_preds = []
 all_targets = []
 
@@ -83,16 +86,24 @@ inf = torch.iinfo(torch.int64).max
 
 with torch.no_grad():
     for batch_seq, batch_tar in test_loader:
-        total_samples += batch_size
+        v = batch_seq.shape[0]
+        if v != batch_size:
+            print(v)
+        total_samples += v
+        # move batch to gpu
         batch_seq = batch_seq.to(device)
         batch_tar = batch_tar.to(device)
-        #avg_neighbors = torch.mean(batch_seq, dims=(1,2))
-        print(batch_seq.shape, batch_tar.shape)
+
+        # model forward pass
         outputs = model(batch_seq)
-        avg_neighbors += torch.mean( torch.abs(outputs - torch.mean(batch_seq, dim=(1,2))))
-        print(f"Average of neighbors : {avg_neighbors/ batch_size} \n Y_pred mean : {outputs/batch_size}")
-        print(f"Baseline error : {avg_neighbors}")
-	# MSE loss
+
+        # compute the baseline error
+        local_navg = torch.mean(batch_seq, dims=(1, 2))
+        print(type(local_navg))
+        # avg_neighbors += torch.mean( torch.abs(outputs - torch.mean(batch_seq, dim=(1,2))))
+        # print(f"Average of neighbors : {avg_neighbors/ batch_size} \n Y_pred mean : {outputs/batch_size}")
+        # print(f"Baseline error : {avg_neighbors}")
+        # MSE loss
         loss = criterion(outputs, batch_tar)
         total_loss += loss.item()
         avg_loss = total_loss / total_samples
@@ -105,25 +116,27 @@ with torch.no_grad():
         Aj = torch.abs(batch_tar - outputs)
 
         Pj = torch.abs(batch_tar)
-        mare = (
-            Aj[mask] / Pj[mask]
-        ).sum()
+        mare = (Aj[mask] / Pj[mask]).sum()
         total_mare += mare
         num_batches += 1
         all_preds.append(outputs.cpu())
         all_targets.append(batch_tar.cpu())
+        break
 
-
+"""
 average_loss = total_loss / num_batches
 avg_mare = total_mare / total_samples
 
-data["mse_test_error"] = average_loss
-data["mare_test_error"] = avg_mare
+#test = torch.load(output_file, map_location="cpu")
 
-torch.save(data, load_file)
+my_dict = {}
+my_dict["avg_mse"] = average_loss
+my_dict["avg_mare"] = avg_mare
 
-diff = (len(test_dataset) - total_samples) / len(test_dataset) #should yield 0
-print(f"diff = {diff}\n\n")
+torch.save(my_dict, output_file) #\\TODO check this works
+
+diff = (len(test_dataset) - total_samples_marre) #should yield 0 -> neg value
+print(f"samples not processed by MARE = {diff}\n\n")
 print(f"Trial completed with average test MSE loss : {average_loss:.4f}")
 print(f"Trial completed with average test MARE loss : {avg_mare:.4f}")
 
@@ -179,3 +192,4 @@ plt.close(fig)
 
 writer.add_figure("Prediction_vs_Target_RNNTest", fig)
 writer.close()
+"""
