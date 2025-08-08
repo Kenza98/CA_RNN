@@ -48,12 +48,11 @@ class VanillaRNN(nn.Module):
 data_file = "sst_test_set.pt"
 model_file = "../data/sst_train_set.pt"
 output_file = "testset_results.pt"
-
-
 data = torch.load(data_file, map_location="cpu")
 model_loader = torch.load(model_file, map_location="cpu")
 # recuperate test data
-X, Y = data["X"], data["Y"]  # these are not normalized and not nan free
+X, Y = data["X"], data["Y"]  # not normalized nut nan free.
+total_samples = X.shape[0]
 
 test_dataset = TensorDataset(X, Y)
 
@@ -68,128 +67,104 @@ model = VanillaRNN(input_dim, hidden_dim, output_dim)
 model.load_state_dict(model_loader["model_state_dict"])
 model = model.to(device)
 
-criterion = nn.MSELoss()
-
+criterion = nn.MSELoss(reduction="sum") 
 model.eval()
-
 
 total_mare = 0
 total_loss = 0
-num_batches = 0
-total_samples = 0
-total_samples_marre = 0
-avg_neighbors = 0  # for baseline error
+
+total_baseline_mse = 0  # for baseline mse error
+total_baseline_mare = 0  # for baseline mare error
 all_preds = []
-all_targets = []
+all_baselines = []
 
 inf = torch.iinfo(torch.int64).max
+neigh_indices = [i for i in range(9) if i != 4]
 
 with torch.no_grad():
     for batch_seq, batch_tar in test_loader:
-        v = batch_seq.shape[0]
-        if v != batch_size:
-            print(v)
-        total_samples += v
         # move batch to gpu
-        batch_seq = batch_seq.to(device)
-        batch_tar = batch_tar.to(device)
+        # batch_seq = batch_seq.to(device)
+        # batch_tar = batch_tar.to(device)
 
         # model forward pass
         outputs = model(batch_seq)
+        outputs.squeeze_()  # remove the last dimension if it's 1
+        outputs = outputs.to(device)
+        local_only = batch_seq[:, -1, neigh_indices] 
+        #print(local_only.shape)
+        local_navg = torch.mean(local_only, dim=1)
 
-        # compute the baseline error
-        local_navg = torch.mean(batch_seq, dims=(1, 2))
-        print(type(local_navg))
-        # avg_neighbors += torch.mean( torch.abs(outputs - torch.mean(batch_seq, dim=(1,2))))
-        # print(f"Average of neighbors : {avg_neighbors/ batch_size} \n Y_pred mean : {outputs/batch_size}")
-        # print(f"Baseline error : {avg_neighbors}")
+        #local_navg = local_navg.to(device)  # move to device
+
+        # compute the baseline errors
+        # *** MSE ***
+        #mse_baseline = ((batch_tar - local_navg) ** 2).sum()  # mse for this batch
+        local_navg.squeeze_()
+        batch_tar.squeeze_()
+        
+        total_baseline_mse += criterion(local_navg, batch_tar).item()
+        # ****MARE ***
+        mare_baseline = torch.abs(
+            (batch_tar - local_navg) / batch_tar
+        )  # for this batch
+        total_baseline_mare += mare_baseline.sum()  # accumulate
+
         # MSE loss
-        loss = criterion(outputs, batch_tar)
-        total_loss += loss.item()
-        avg_loss = total_loss / total_samples
-        writer.add_scalar("Loss/train", avg_loss)
+        total_loss += criterion(outputs, batch_tar).item()
 
         # MARE loss
-        mask = batch_tar > 0.05
-        total_samples_marre += batch_tar[mask].numel()
-
         Aj = torch.abs(batch_tar - outputs)
-
         Pj = torch.abs(batch_tar)
-        mare = (Aj[mask] / Pj[mask]).sum()
-        total_mare += mare
-        num_batches += 1
+        mare = (Aj / Pj).sum()
+        total_mare += mare  # accumule entire batches
+
         all_preds.append(outputs.cpu())
-        all_targets.append(batch_tar.cpu())
-        break
+        all_baselines.append(local_navg.cpu())
 
-"""
-average_loss = total_loss / num_batches
+
+# *** MSE and baseline mse ***
+final_baseline_mse = total_baseline_mse / total_samples
+average_loss = total_loss / total_samples
+print(total_samples)
+
+print(f"average baseline MSE err : {final_baseline_mse}")
+print(f"average MSE err : {average_loss}")
+
+# *** MARE and baseline MARE ***
 avg_mare = total_mare / total_samples
+final_baseline_mare = total_baseline_mare / total_samples
 
-#test = torch.load(output_file, map_location="cpu")
+print(f"Trial completed with average test MARE loss : {avg_mare:.4f}")
+print(f"average baseline MARE err : {final_baseline_mare}")
+
+
+# save results to output pt file
 
 my_dict = {}
 my_dict["avg_mse"] = average_loss
 my_dict["avg_mare"] = avg_mare
+my_dict["baseline_mse"] = final_baseline_mse
+my_dict["baseline_mare"] = final_baseline_mare
+my_dict["num_samples"] = total_samples
 
-torch.save(my_dict, output_file) #\\TODO check this works
 
-diff = (len(test_dataset) - total_samples_marre) #should yield 0 -> neg value
-print(f"samples not processed by MARE = {diff}\n\n")
-print(f"Trial completed with average test MSE loss : {average_loss:.4f}")
-print(f"Trial completed with average test MARE loss : {avg_mare:.4f}")
-
-writer = SummaryWriter(log_dir="synthetic_data_interpolation/runs/test_aitems")
-
+writer = SummaryWriter(log_dir="runs/test_aitems")
 writer.add_scalar("loss/test_rnn_mse", average_loss)
 writer.add_scalar("loss/test_rnn_mare", avg_mare)
+writer.add_scalar("loss/test_rnn_baseline_mse", final_baseline_mse)
+writer.add_scalar("loss/test_rnn_baseline_mare", final_baseline_mare)
 
 
 # Concatenate all samples
-y_pred = torch.cat(all_preds).squeeze().numpy()
-y_true = torch.cat(all_targets).squeeze().numpy()
+Y_model = torch.cat(all_preds)
+Y_baseline = torch.cat(all_baselines)
 
-#checking some stuff about conv
+my_dict["Y_model"] = Y_model
+my_dict["Y_baseline"] = Y_baseline
+my_dict["Y_true"] = Y
 
-y_std = np.std(y_true)
-y_mean = np.mean(y_true)
-print(f"Target Mean: {y_mean:.4f}")
-print(f"Target Std Dev: {y_std:.4f}")
-
-writer.add_scalar("stats/test_target_std", y_std)
-writer.add_scalar("stats/test_target_mean", y_mean)
-# to denormalize y_pred_denorm = y_pred * Y_std + Y_mean
-#histogram of predictions vs targets
-hist_fig ,hist_ax = plt.subplots(figsize=(12,6))
-
-hist_ax.hist(y_true, bins=50, alpha=0.7, label="Targets")
-hist_ax.hist(y_pred, bins=50, alpha=0.7, label="Predictions")
-hist_ax.legend()
-hist_ax.set_title("Distribution of Predictions vs Targets")
-hist_ax.set_xlabel("Value")
-hist_ax.set_ylabel("Frequency")
-out_dir = os.path.dirname(__file__)
-hist_fig.savefig(os.path.join(out_dir, "hist_pred_vs_target.png"), dpi=150, bbox_inches="tight")
-fig.savefig(os.path.join(out_dir, "zoom_pred_vs_target.png"), dpi=150, bbox_inches="tight")
-
-writer.add_figure("Histogram_Pred_vs_Target", hist_fig)
-plt.close(hist_fig)
+torch.save(my_dict, output_file)
 
 
-# Create matplotlib figure
-M = 300
-fig, ax = plt.subplots(figsize=(12, 6))
-ax.plot(y_true[:M], label="Target", marker="o", markersize=3, linestyle="-", alpha=0.7)
-ax.plot(y_pred[:M], label="Prediction", marker="x", markersize=3, linestyle="-", alpha=0.7)
-ax.set_title("Zoomed-in: First 300 Test Samples")
-ax.set_xlabel("Sample Index")
-ax.set_ylabel("Value")
-ax.legend()
-fig.savefig(os.path.join(out_dir ,"zoom_pred_vs_target.png"), dpi=150, bbox_inches="tight")
-writer.add_figure("Prediction_vs_Target_RNNTest", fig)
-plt.close(fig)
-
-writer.add_figure("Prediction_vs_Target_RNNTest", fig)
 writer.close()
-"""

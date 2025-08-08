@@ -12,15 +12,9 @@ import xarray as xr
 import gc
 import sys
 import numpy as np
+from tqdm import tqdm
 
 sys.stdout.flush()
-from tqdm import tqdm
-
-import torch
-import xarray as xr
-import numpy as np
-import gc
-from tqdm import tqdm
 
 
 def build_learning_set_from_xarray(
@@ -32,6 +26,7 @@ def build_learning_set_from_xarray(
     # Open with lazy loading
     ds = xr.open_dataset(nc_path, chunks={"time": chunk_size})
     sst = ds["thetao"]
+    print(sst)
     if "depth" in sst.dims:
         sst = sst.isel(depth=0)
 
@@ -94,7 +89,7 @@ def build_learning_set_from_xarray(
 
 
 X_train, Y_train = build_learning_set_from_xarray(
-    "train_sst.nc",
+    "test_year.nc",
     seq_length=8,
     chunk_size=200,
     use_gpu=True,
@@ -102,5 +97,4 @@ X_train, Y_train = build_learning_set_from_xarray(
 
 print(f"X shape: {X_train.shape}, Y shape: {Y_train.shape}")
 
-
-torch.save({"X": X_train, "Y": Y_train}, "sst_train_set.pt")
+torch.save({"X": X_train, "Y": Y_train}, "../tests/sst_test_set.pt")

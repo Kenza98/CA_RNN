@@ -1,6 +1,8 @@
+#from torch.autocast_mode import autocast
 import torch
 import time
 import argparse
+
 # Command-line args
 parser = argparse.ArgumentParser()
 parser.add_argument("--use-gpu", action="store_true", help="Use GPU if available")
@@ -21,11 +23,11 @@ import matplotlib.pyplot as plt
 load_file = "../data/sst_train_set.pt"
 data = torch.load(load_file, map_location="cpu")
 
-X= data["X"]
-Y=data["Y"]
+X = data["X"]
+Y = data["Y"]
 
-#X = torch.tensor(X, dtype=torch.float32)
-#Y = torch.tensor(Y, dtype=torch.float32)
+# X = torch.tensor(X, dtype=torch.float32)
+# Y = torch.tensor(Y, dtype=torch.float32)
 
 train_dataset = TensorDataset(X, Y)
 
@@ -33,7 +35,7 @@ train_loader = DataLoader(train_dataset, batch_size=256, shuffle=True, num_worke
 
 nb_features = 1
 learning_rate = 1e-4
-num_epochs = 10
+num_epochs = 15
 batch_size = 32
 output_dim = 1
 input_dim = 9
@@ -46,7 +48,7 @@ criterion = nn.MSELoss()
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 model.train()
 
-grad_history = {} #store gradient over epoch to plot smt, the log takes time...
+grad_history = {}  # store gradient over epoch to plot smt, the log takes time...
 
 for epoch in range(num_epochs):
     epoch_start = time.time()
@@ -59,7 +61,7 @@ for epoch in range(num_epochs):
         y_pred = model(x_batch)
 
         loss = criterion(y_pred, y_batch)
-        loss.backward() #propagate the gradients
+        loss.backward()  # propagate the gradients
 
         with torch.no_grad():
             grad_norms = []
@@ -72,25 +74,25 @@ for epoch in range(num_epochs):
 
         optimizer.step()
         epoch_loss += loss.item()
-     # Average loss
-     avg_loss = epoch_loss / len(train_loader)
+    # Average loss
+    avg_loss = epoch_loss / len(train_loader)
 
-     # GPU memory usage (MB)
-     if device.type == "cuda":
+    # GPU memory usage (MB)
+    if device.type == "cuda":
         mem_alloc = torch.cuda.memory_allocated(device) / 1024**2
         mem_reserved = torch.cuda.memory_reserved(device) / 1024**2
-     else:
+    else:
         mem_alloc = mem_reserved = 0
 
-     epoch_time = time.time() - epoch_start
+    epoch_time = time.time() - epoch_start
 
-     print(
+    print(
         f"Epoch {epoch+1}/{num_epochs} | "
         f"Loss: {avg_loss:.4f} | "
         f"GPU Mem: {mem_alloc:.1f}MB/{mem_reserved:.1f}MB | "
         f"Time: {epoch_time:.2f}s",
-        flush=True
-     )
+        flush=True,
+    )
 plt.figure(figsize=(10, 6))
 for name, norms in grad_history.items():
     plt.plot(norms, label=name)
@@ -106,7 +108,7 @@ plt.show()
 
 
 data["model_state_dict"] = model.state_dict()
-data["model_type"] = model.__class__.__name__   #fixed 
+data["model_type"] = model.__class__.__name__  # fixed
 # Save everything back to the same .pt file
 torch.save(data, load_file)
 print(f"Model saved to {load_file}")
