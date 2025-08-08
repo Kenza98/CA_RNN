@@ -23,14 +23,11 @@ import matplotlib.pyplot as plt
 load_file = "../data/sst_train_set.pt"
 data = torch.load(load_file, map_location="cpu")
 
-X = data["X"]
+X = data["X"][:, :, 4] # select only the central cell.
+X.unsqueeze_(2)  # add a channel dimension
 Y = data["Y"]
 
-# X = torch.tensor(X, dtype=torch.float32)
-# Y = torch.tensor(Y, dtype=torch.float32)
-
 train_dataset = TensorDataset(X, Y)
-
 train_loader = DataLoader(train_dataset, batch_size=256, shuffle=True, num_workers=8)
 
 nb_features = 1
@@ -38,7 +35,7 @@ learning_rate = 1e-4
 num_epochs = 15
 batch_size = 32
 output_dim = 1
-input_dim = 9
+input_dim = 1
 seq_length = 4
 hidden_dim = 7 * 8
 
@@ -47,6 +44,8 @@ model.to(device)
 criterion = nn.MSELoss()
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 model.train()
+
+train_loss = [] # to store loss over epochs
 
 grad_history = {}  # store gradient over epoch to plot smt, the log takes time...
 
@@ -61,6 +60,7 @@ for epoch in range(num_epochs):
         y_pred = model(x_batch)
 
         loss = criterion(y_pred, y_batch)
+        
         loss.backward()  # propagate the gradients
 
         with torch.no_grad():
@@ -76,7 +76,8 @@ for epoch in range(num_epochs):
         epoch_loss += loss.item()
     # Average loss
     avg_loss = epoch_loss / len(train_loader)
-
+    train_loss.append(avg_loss)
+    print(train_loss[-1], flush=True)
     # GPU memory usage (MB)
     if device.type == "cuda":
         mem_alloc = torch.cuda.memory_allocated(device) / 1024**2
@@ -96,6 +97,13 @@ for epoch in range(num_epochs):
 plt.figure(figsize=(10, 6))
 for name, norms in grad_history.items():
     plt.plot(norms, label=name)
+
+plt.plot(train_loss)
+plt.xlabel("Epoch")
+plt.ylabel("MSE Loss")
+plt.title("Training Loss Over Epochs")
+plt.grid(True)
+plt.savefig("train_loss_curve.png", dpi=150, bbox_inches="tight")
 
 plt.xlabel("Epoch")
 plt.ylabel("Gradient Norm")
