@@ -43,7 +43,6 @@ class VanillaRNN(nn.Module):
         out = self.fc(out[:, -1, :])  # Use the last hidden state
         return out
 
-
 # paths
 data_file = "sst_test_set.pt"
 model_file = "../data/sst_train_set.pt"
@@ -51,14 +50,15 @@ output_file = "testset_results.pt"
 data = torch.load(data_file, map_location="cpu")
 model_loader = torch.load(model_file, map_location="cpu")
 # recuperate test data
-X, Y = data["X"], data["Y"]  # not normalized nut nan free.
+X = data["X"][:,:,4] # select only the central cell.
+Y = data["Y"]  # not normalized nut nan free.
 total_samples = X.shape[0]
 
 test_dataset = TensorDataset(X, Y)
 
 batch_size = 32
 output_dim = 1
-input_dim = 9
+input_dim = 1
 hidden_dim = 7 * 8
 
 test_loader = DataLoader(test_dataset, batch_size, shuffle=True)
@@ -84,18 +84,18 @@ neigh_indices = [i for i in range(9) if i != 4]
 with torch.no_grad():
     for batch_seq, batch_tar in test_loader:
         # move batch to gpu
-        # batch_seq = batch_seq.to(device)
-        # batch_tar = batch_tar.to(device)
+        batch_seq = batch_seq.to(device)
+        batch_tar = batch_tar.to(device)
 
         # model forward pass
         outputs = model(batch_seq)
         outputs.squeeze_()  # remove the last dimension if it's 1
-        outputs = outputs.to(device)
+        #outputs = outputs.to(device) ---> redundant, already on GPU
         local_only = batch_seq[:, -1, neigh_indices] 
         #print(local_only.shape)
         local_navg = torch.mean(local_only, dim=1)
 
-        #local_navg = local_navg.to(device)  # move to device
+        local_navg = local_navg.to(device)  # move to device
 
         # compute the baseline errors
         # *** MSE ***
@@ -104,6 +104,7 @@ with torch.no_grad():
         batch_tar.squeeze_()
         
         total_baseline_mse += criterion(local_navg, batch_tar).item()
+        
         # ****MARE ***
         mare_baseline = torch.abs(
             (batch_tar - local_navg) / batch_tar
@@ -114,11 +115,8 @@ with torch.no_grad():
         total_loss += criterion(outputs, batch_tar).item()
 
         # MARE loss
-        Aj = torch.abs(batch_tar - outputs)
-        Pj = torch.abs(batch_tar)
-        mare = (Aj / Pj).sum()
-        total_mare += mare  # accumule entire batches
-
+        mare = torch.abs(batch_tar-outputs)/batch_tar
+        total_mare += mare.sum() #sum of MARE of the current batch
         all_preds.append(outputs.cpu())
         all_baselines.append(local_navg.cpu())
 
