@@ -1,4 +1,4 @@
-#from torch.autocast_mode import autocast
+# from torch.autocast_mode import autocast
 import torch
 import time
 import argparse
@@ -23,7 +23,7 @@ import matplotlib.pyplot as plt
 load_file = "../data/sst_train_set.pt"
 data = torch.load(load_file, map_location="cpu")
 
-X = data["X"][:, :, 4] # select only the central cell.
+X = data["X"][:, :, 4]  # select only the central cell.
 X.unsqueeze_(2)  # add a channel dimension
 Y = data["Y"]
 
@@ -45,7 +45,7 @@ criterion = nn.MSELoss()
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 model.train()
 
-train_loss = [] # to store loss over epochs
+train_loss = []  # to store loss over epochs
 
 grad_history = {}  # store gradient over epoch to plot smt, the log takes time...
 
@@ -60,7 +60,7 @@ for epoch in range(num_epochs):
         y_pred = model(x_batch)
 
         loss = criterion(y_pred, y_batch)
-        
+
         loss.backward()  # propagate the gradients
 
         with torch.no_grad():
