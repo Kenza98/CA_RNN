@@ -25,8 +25,7 @@ data = torch.load(load_file, map_location="cpu")
 
 X = data["X"][:, :, 4]  # select only the central cell.
 X.unsqueeze_(2)  # add a channel dimension
-print(X.shape)
-exit()
+
 Y = data["Y"]
 
 train_dataset = TensorDataset(X, Y)
@@ -34,7 +33,7 @@ train_loader = DataLoader(train_dataset, batch_size=256, shuffle=True, num_worke
 
 nb_features = 1
 learning_rate = 1e-4
-num_epochs = 1
+num_epochs = 20
 batch_size = 32
 output_dim = 1
 input_dim = 1
