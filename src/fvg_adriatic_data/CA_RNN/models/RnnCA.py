@@ -106,6 +106,8 @@ torch.save(data, load_file)
 print(f"Model saved to {load_file}")
 
 # showing gradient descent
+
+"""
 plt.figure(figsize=(10, 6))
 for name, norms in grad_history.items():
     plt.plot(norms, label=name)
@@ -125,3 +127,10 @@ plt.grid(True)
 plt.tight_layout()
 plt.savefig("gradient_norms.png")
 plt.show()
+"""
+
+data["model_state_dict"] = model.state_dict()
+data["model_type"] = model.__class__.__name__  # fixed
+# Save everything back to the same .pt file
+torch.save(data, load_file)
+print(f"Model saved to {load_file}")
