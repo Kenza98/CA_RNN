@@ -20,11 +20,13 @@ import matplotlib.pyplot as plt
 
 
 # "./data/cop_ml_ready.pt"
-load_file = "../data/sst_train_set.pt"
+load_file = "data/sst_train_set.pt"
 data = torch.load(load_file, map_location="cpu")
 
 X = data["X"][:, :, 4]  # select only the central cell.
 X.unsqueeze_(2)  # add a channel dimension
+print(X.shape)
+exit()
 Y = data["Y"]
 
 train_dataset = TensorDataset(X, Y)
@@ -32,11 +34,11 @@ train_loader = DataLoader(train_dataset, batch_size=256, shuffle=True, num_worke
 
 nb_features = 1
 learning_rate = 1e-4
-num_epochs = 15
+num_epochs = 1
 batch_size = 32
 output_dim = 1
 input_dim = 1
-seq_length = 4
+seq_length = 8
 hidden_dim = 7 * 8
 
 model = vrnn.VanillaRNN(input_dim, hidden_dim, output_dim)
@@ -50,6 +52,7 @@ train_loss = []  # to store loss over epochs
 grad_history = {}  # store gradient over epoch to plot smt, the log takes time...
 
 for epoch in range(num_epochs):
+    print(f"Epoch {epoch+1}/{num_epochs} \n computing ...\n...\n...")
     epoch_start = time.time()
     epoch_loss = 0.0
     for x_batch, y_batch in train_loader:
@@ -88,12 +91,21 @@ for epoch in range(num_epochs):
     epoch_time = time.time() - epoch_start
 
     print(
-        f"Epoch {epoch+1}/{num_epochs} | "
         f"Loss: {avg_loss:.4f} | "
         f"GPU Mem: {mem_alloc:.1f}MB/{mem_reserved:.1f}MB | "
-        f"Time: {epoch_time:.2f}s",
+        f"Time: {epoch_time:.2f}s | ",
+        f" {epoch_time/60:.2f} min",
         flush=True,
     )
+
+# saving model to pt file
+data["model_state_dict"] = model.state_dict()
+data["model_type"] = model.__class__.__name__  # fixed
+# Save everything back to the same .pt file
+torch.save(data, load_file)
+print(f"Model saved to {load_file}")
+
+# showing gradient descent
 plt.figure(figsize=(10, 6))
 for name, norms in grad_history.items():
     plt.plot(norms, label=name)
@@ -103,7 +115,7 @@ plt.xlabel("Epoch")
 plt.ylabel("MSE Loss")
 plt.title("Training Loss Over Epochs")
 plt.grid(True)
-plt.savefig("train_loss_curve.png", dpi=150, bbox_inches="tight")
+plt.savefig("./train_loss_curve.png", dpi=150, bbox_inches="tight")
 
 plt.xlabel("Epoch")
 plt.ylabel("Gradient Norm")
@@ -113,10 +125,3 @@ plt.grid(True)
 plt.tight_layout()
 plt.savefig("gradient_norms.png")
 plt.show()
-
-
-data["model_state_dict"] = model.state_dict()
-data["model_type"] = model.__class__.__name__  # fixed
-# Save everything back to the same .pt file
-torch.save(data, load_file)
-print(f"Model saved to {load_file}")

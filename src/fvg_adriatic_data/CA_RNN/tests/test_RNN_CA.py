@@ -43,12 +43,12 @@ class VanillaRNN(nn.Module):
         out = self.fc(out[:, -1, :])  # Use the last hidden state
         return out
 
+
 # paths
-data_file = "./sst_test_set.pt"
-model_file = "../data/sst_train_set.pt"
-output_file = "./testset_results.pt"
+data_file = "tests/sst_test_set.pt"
+model_file = "data/sst_train_set.pt"
+output_file = "tests/testset_results.pt"
 data = torch.load(data_file, map_location="cpu")
-print(data.keys())
 model_loader = torch.load(model_file, map_location="cpu")
 # recuperate test data
 
@@ -102,6 +102,8 @@ model.eval()
 criterion = nn.MSELoss(reduction="sum")  # sum on GPU; divide later
 
 neigh_indices = [i for i in range(9) if i != 4]
+
+
 total_loss = torch.tensor(0.0, device=device)
 total_mare = torch.tensor(0.0, device=device)
 total_baseline_mse = torch.tensor(0.0, device=device)
@@ -112,32 +114,13 @@ all_preds = []
 all_baselines = []
 
 with torch.no_grad():
-    for batch_seq, batch_tar in test_loader:
-        batch_seq = batch_seq.to(device, non_blocking=True)
-        batch_tar = batch_tar.to(device, non_blocking=True)
-        # model (on GPU maintenant)
-        outputs = model(batch_seq.unsqueeze(-1))
-        #print("target", batch_tar.shape, "output", outputs.shape)
-        #exit()
-        # MSE (sum on GPU)
-        total_loss += criterion(outputs, batch_tar)
-
-        # MARE with mask (GPU)
-        target = batch_tar.abs()
-        mask = target > 1e-6
-        total_mare += (
-            (outputs - batch_tar).abs()[mask] / target[mask]
-        ).sum()
-        num_mare += mask.sum()
-        all_preds.append(outputs.cpu())
-
     for batch_seq, batch_tar in baseline_loader:
         batch_seq = batch_seq.to(device, non_blocking=True)
         batch_tar = batch_tar.to(device, non_blocking=True)
-        local_only = batch_seq[:, neigh_indices]
+        local_only = batch_seq[:, -1, neigh_indices]
         local_navg = local_only.mean(dim=1)
         # MSE (sum on GPU)
-        total_baseline_mse += criterion(local_navg, batch_tar.squeeze(-1))
+        total_baseline_mse += criterion(local_navg, batch_tar.squeeze_())
         # MARE with mask (GPU)
         target = batch_tar.squeeze(-1).abs()
         mask = target > 1e-6
@@ -145,6 +128,22 @@ with torch.no_grad():
             (local_navg - batch_tar.squeeze(-1)).abs()[mask] / target[mask]
         ).sum()
         all_baselines.append(local_navg.cpu())
+    for batch_seq, batch_tar in test_loader:
+        batch_seq = batch_seq.to(device, non_blocking=True)
+        batch_tar = batch_tar.to(device, non_blocking=True)
+        # model (on GPU maintenant)
+        outputs = model(batch_seq.unsqueeze_(-1))  # add feature dim
+
+        # MSE (sum on GPU)
+        total_loss += criterion(outputs, batch_tar)
+
+        # MARE with mask (GPU)
+        target = batch_tar.abs()
+        target = batch_tar.squeeze_().abs()
+        mask = target > 1e-6
+        total_mare += ((outputs - batch_tar.squeeze()).abs()[mask] / target[mask]).sum()
+        num_mare += mask.sum()
+        all_preds.append(outputs.cpu())
 
 
 # move to CPU once
