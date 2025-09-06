@@ -44,9 +44,9 @@ class VanillaRNN(nn.Module):
         return out
 
 # paths
-data_file = "./tests/sst_test_set.pt"
-model_file = "./data/sst_train_set.pt"
-output_file = "testset_results.pt"
+data_file = "./sst_test_set.pt"
+model_file = "../data/sst_train_set.pt"
+output_file = "./testset_results.pt"
 data = torch.load(data_file, map_location="cpu")
 print(data.keys())
 model_loader = torch.load(model_file, map_location="cpu")
@@ -72,7 +72,28 @@ baseline_loader = DataLoader(baseline_dataset, batch_size, shuffle=True)
 model = VanillaRNN(input_dim, hidden_dim, output_dim)
 model.load_state_dict(model_loader["model_state_dict"])
 model = model.to(device)
+"""
+print("=== Infos sur le modèle ===")
+print(model)  # architecture complète
 
+# Nombre total de paramètres
+n_params = sum(p.numel() for p in model.parameters())
+n_trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+print(f"Total params : {n_params:,} | Entraînables : {n_trainable:,}")
+
+# Vérifie input/output
+print(f"Input dim attendu : {model.rnn.input_size}")
+print(f"Hidden dim : {model.rnn.hidden_size}")
+print(f"Num layers : {model.rnn.num_layers}")
+print(f"Output dim : {model.fc.out_features}")
+
+# Teste avec un batch factice
+dummy = torch.randn(2, 8, 1).to(device)   # batch=2, seq_len=8, feat=1
+with torch.no_grad():
+    out = model(dummy)
+print(f"Dummy input shape : {tuple(dummy.shape)}")
+print(f"Dummy output shape: {tuple(out.shape)}")
+"""
 criterion = nn.MSELoss(reduction="sum")
 model.eval()
 
@@ -95,16 +116,17 @@ with torch.no_grad():
         batch_seq = batch_seq.to(device, non_blocking=True)
         batch_tar = batch_tar.to(device, non_blocking=True)
         # model (on GPU maintenant)
-        outputs = model(batch_seq).squeeze(-1)
-
+        outputs = model(batch_seq.unsqueeze(-1))
+        #print("target", batch_tar.shape, "output", outputs.shape)
+        #exit()
         # MSE (sum on GPU)
-        total_loss += criterion(outputs, batch_tar.squeeze(-1))
+        total_loss += criterion(outputs, batch_tar)
 
         # MARE with mask (GPU)
-        target = batch_tar.squeeze(-1).abs()
+        target = batch_tar.abs()
         mask = target > 1e-6
         total_mare += (
-            (outputs - batch_tar.squeeze(-1)).abs()[mask] / target[mask]
+            (outputs - batch_tar).abs()[mask] / target[mask]
         ).sum()
         num_mare += mask.sum()
         all_preds.append(outputs.cpu())
