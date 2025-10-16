@@ -1,0 +1,45 @@
+[tool.poetry]
+name = "fvg-adriatic-data"
+version = "0.1.0"
+description = ""
+authors = ["Kenza98 <kenzab15@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pandas = "^2.2.1"
+numpy = "^1.26.4"
+scikit-learn = "^1.4.1.post1"
+torch = "^2.2.1"
+pytest = "^8.0.2"
+ipykernel = "^6.29.3"
+matplotlib = "^3.8.3"
+netcdf4 = "^1.6.5"
+scipy = "^1.12.0"
+polars = "^0.20.22"
+dask = "^2024.4.2"
+dask-expr = "^1.0.12"
+seaborn = "^0.13.2"
+psycopg2-binary = "^2.9.9"
+pyqt5 = "^5.15.11"
+h5py = "^3.12.1"
+optuna = "^4.2.1"
+plotly = "^6.0.0"
+torchvision = "^0.22.0"
+tensorboard = "^2.19.0"
+cartopy = "^0.24.1"
+copernicusmarine = "^2.2.0"
+
+
+[tool.poetry.group.dev.dependencies]
+ipykernel = "^6.29.3"
+black = "^25.1.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+lbm-optim = "src.fvg_adriatic_data.lbl_dataset2_RNN_optimization:main"
+
+
