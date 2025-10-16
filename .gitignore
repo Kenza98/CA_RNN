@@ -1,0 +1,27 @@
+# Python cache and compiled files
+__pycache__/
+*.pyc
+*.pyo
+
+# Large model and dataset files
+
+*.pth
+*.h5
+*.npz
+*.nc
+
+# Logs
+*.log
+*.out
+*.err
+logs/
+*/logs/
+
+
+.slurm
+
+# Any test runs output directories
+runs/
+*/runs/
+
+
