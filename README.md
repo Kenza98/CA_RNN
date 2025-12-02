@@ -44,7 +44,7 @@ CA_RNN_repo/
    poetry install
 ```
 
-3. activate the thuis created Virtual Environment:
+3. activate the thus created Virtual Environment:
 ```bash
    poetry shell
 ```
@@ -78,7 +78,7 @@ pip install -r requirements.txt
 Once installed, the package can be used in the following way:
 
 1. Running **RnnMoore.py** will train the model and write the final model's parameters into **rnn_moore.pt**
-2. Running **test_RNN.CA.py** will test the model and write the test results to **rnn_moore.pt**
+2. Running **test_RNN_CA.py** will test the model and write the test results to **rnn_moore.pt**
 3. The files where visualizations scripts are available are:
 - visualize_results.py
 4. Some visualizations are available in the **.png** files.
