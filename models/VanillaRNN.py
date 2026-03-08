@@ -1,11 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.optim as optim
-import h5py
-import numpy as np
-import torch.nn.functional as F
-
-
 # my RNN subclasses torch.nn.Module
 class VanillaRNN(nn.Module):
     # This method initializes the layers of the model:

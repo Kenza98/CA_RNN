@@ -1,20 +1,21 @@
-# from torch.autocast_mode import autocast
-#import torch
 import time
 import argparse
 from pathlib import Path
-from .plots_model import *
 
+import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import random_split, DataLoader, TensorDataset
-from .VanillaRNN import *
+from torch.utils.data import DataLoader, TensorDataset
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+
 DATA_DIR = PROJECT_ROOT / "data"
-MODEL_DIR = PROJECT_ROOT / "models"
+MODEL_DIR = PROJECT_ROOT / "src/models"
 OUT_DIR = PROJECT_ROOT / "outputs"
+
+#from MODEL_DIR.plots_model import *
+from .lstm import *
 
 # GPU usage if available
 parser = argparse.ArgumentParser()
@@ -25,49 +26,55 @@ args = parser.parse_args()
 device = torch.device("cuda" if (args.use_gpu and torch.cuda.is_available()) else "cpu")
 print(f"Using device: {device}", flush=True)
 
+# Define paths
+load_file = DATA_DIR / "sst_test_set.pt"
+model_file = MODEL_DIR / "lstm_moore.pt"
 
-#define paths
-load_file = DATA_DIR / "sst_train_set.pt"
-model_file = MODEL_DIR / "rnn_moore.pt"
-#exit(0)
-#load files using Path objects as file names
+# Load files
 data = torch.load(load_file, map_location="cpu")
-checkpoint = torch.load(model_file, map_location="cpu")
 
-X = data["X"]  # moore neighborhood enriched TS already in sequence format
+# If you already have an LSTM checkpoint, load it
+if model_file.exists():
+    checkpoint = torch.load(model_file, map_location="cpu")
+else:
+    checkpoint = {}
+
+X = data["X"]   # moore neighborhood enriched TS already in sequence format
 Y = data["Y"]
 
 train_dataset = TensorDataset(X, Y)
+
 train_loader = DataLoader(train_dataset, batch_size=256, shuffle=True, num_workers=8)
 
-#I/O DIMs
-nb_features = 9  # (input dim)
+# I/O dimensions
+nb_features = 9
 input_dim = nb_features
 output_dim = 1
 
-#HYP PARAMETERS
+# Hyperparameters
 learning_rate = 1e-4
-num_epochs = 30
-batch_size = 32
+num_epochs = 5
+
 seq_length = 8
 hidden_dim = 7 * 8
+num_layers = 1
 
-
-#MODEL
-model = VanillaRNN(input_dim, hidden_dim, output_dim)
+# Model
+model = VanillaLSTM(input_dim, hidden_dim, output_dim, num_layers=num_layers)
 model.to(device)
+
 criterion = nn.MSELoss()
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 model.train()
 
-
-train_loss = []  # to store loss over epochs
-grad_history = {}  # store gradient over epoch to plot later
+train_loss = []
+grad_history = {}
 
 for epoch in range(num_epochs):
     print(f"Epoch {epoch+1}/{num_epochs}\ncomputing ...\n...\n...")
     epoch_start = time.time()
     epoch_loss = 0.0
+
     for x_batch, y_batch in train_loader:
         x_batch = x_batch.to(device)
         y_batch = y_batch.to(device)
@@ -76,11 +83,9 @@ for epoch in range(num_epochs):
         y_pred = model(x_batch)
 
         loss = criterion(y_pred, y_batch)
-
-        loss.backward()  # propagate the gradients
+        loss.backward()
 
         with torch.no_grad():
-            grad_norms = []
             for name, param in model.named_parameters():
                 if param.grad is not None:
                     grad_norm = param.grad.norm().item()
@@ -91,11 +96,10 @@ for epoch in range(num_epochs):
         optimizer.step()
         epoch_loss += loss.item()
 
-    # Average loss
     avg_loss = epoch_loss / len(train_loader)
-    #print(avg_loss, flush=True)
+    print(avg_loss, flush=True)
     train_loss.append(avg_loss)
-    
+
     # GPU memory usage (MB)
     if device.type == "cuda":
         mem_alloc = torch.cuda.memory_allocated(device) / 1024**2
@@ -108,22 +112,18 @@ for epoch in range(num_epochs):
     print(
         f"Loss: {avg_loss:.4f} | "
         f"GPU Mem: {mem_alloc:.1f}MB/{mem_reserved:.1f}MB | "
-        f"Time: {epoch_time:.2f}s | ",
-        f" {epoch_time/60:.2f} min",
+        f"Time: {epoch_time:.2f}s | "
+        f"{epoch_time/60:.2f} min",
         flush=True,
     )
 
-# saving model to pt file
-checkpoint["rnnMoore_stateDict"] = model.state_dict()
+# Save model
+checkpoint["lstmMoore_stateDict"] = model.state_dict()
 checkpoint["model_type"] = model.__class__.__name__
 
-# Save everything back to the same .pt file
 torch.save(checkpoint, model_file)
 print(f"Model saved to {model_file}")
 
-
-# --- 1) Training loss ---
-plot_loss_per_epoch(train_loss, OUT_DIR)
-
-# --- 2) Gradient norms per parameter ---
-plot_grad_hist(grad_history, OUT_DIR)
+# Plots
+#plot_loss_per_epoch(train_loss, OUT_DIR)
+#plot_grad_hist(grad_history, OUT_DIR)
