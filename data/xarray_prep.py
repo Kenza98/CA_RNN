@@ -30,8 +30,8 @@ def load_dataset(chunk_size=200):
         maximum_longitude=16,
         minimum_latitude=44.5,
         maximum_latitude=45.5,
-        start_datetime="2023-01-01",
-        end_datetime="2025-12-31",
+        start_datetime="2025-01-01",
+        end_datetime="2026-01-31",
     )
 
     return ds.chunk({"time": chunk_size})
@@ -117,7 +117,7 @@ def main():
 
     print(f"X shape: {X_train.shape}, Y shape: {Y_train.shape}", flush=True)
 
-    output_filepath = OUT_DIR / "sst_train_set.pt"
+    output_filepath = OUT_DIR / "sst_test_set.pt"
 
     torch.save(
         {"X": X_train, "Y": Y_train},

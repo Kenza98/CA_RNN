@@ -25,7 +25,7 @@ if device.type == "cuda":
 
 
 test_data_file = DATA_DIR / "sst_test_set.pt"   #\\CHECK all data test + train in this dir?
-model_file = DATA_DIR / "rnn_moore.pt"
+model_file = MODEL_DIR / "rnn_moore.pt"
 output_file = OUT_DIR / "testset_results.pt"
 
 
@@ -49,7 +49,7 @@ baseline_dataset = TensorDataset(Xn, Y)
 
 batch_size = 256
 output_dim = 1
-input_dim = 9
+input_dim = 1
 hidden_dim = 7 * 8
 
 test_loader = DataLoader(test_dataset, batch_size, shuffle=True)
