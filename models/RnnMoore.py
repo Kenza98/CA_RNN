@@ -7,7 +7,7 @@ from .plots_model import *
 
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import random_split, DataLoader, TensorDataset
+from torch.utils.data import DataLoader, TensorDataset
 from .VanillaRNN import *
 
 
@@ -47,7 +47,7 @@ output_dim = 1
 
 #HYP PARAMETERS
 learning_rate = 1e-4
-num_epochs = 30
+num_epochs = 5
 batch_size = 32
 seq_length = 8
 hidden_dim = 7 * 8
