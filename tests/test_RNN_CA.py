@@ -44,8 +44,8 @@ total_samples = X.shape[0]
 print(f"X has shape N= {X.shape}\n\n")
 print(f"Y has shape N= {Y.shape}\n\n")
 
-test_dataset = TensorDataset(X, Y)
-baseline_dataset = TensorDataset(Xn, Y)
+test_dataset = TensorDataset(Xn, Y)
+baseline_dataset = TensorDataset(X, Y)
 
 batch_size = 256
 output_dim = 1
@@ -98,6 +98,7 @@ all_baselines = []
 model.eval()
 
 with torch.no_grad():
+    #baseline that only computes an average
     for batch_seq, batch_tar in baseline_loader:
         batch_seq = batch_seq.to(device, non_blocking=True)
         batch_tar = batch_tar.to(device, non_blocking=True)
@@ -112,6 +113,8 @@ with torch.no_grad():
             (local_navg - batch_tar.squeeze(-1)).abs()[mask] / target[mask]
         ).sum()
         all_baselines.append(local_navg.cpu())
+    
+    #actual model test
     for batch_seq, batch_tar in test_loader:
         batch_seq = batch_seq.to(device, non_blocking=True)
         batch_tar = batch_tar.to(device, non_blocking=True)
