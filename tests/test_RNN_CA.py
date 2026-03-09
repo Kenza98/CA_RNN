@@ -1,15 +1,21 @@
 import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
-from torch.utils.tensorboard import SummaryWriter
-import matplotlib.pyplot as plt
-import numpy as np
-import os
+import os, sys
+from pathlib import Path
 
-# Create a unique log directory for this run
-log_dir = os.path.join("runs", f"rnnca_job_{os.environ.get('SLURM_JOB_ID', 'local')}")
-writer = SummaryWriter(log_dir=log_dir)
-print(f"TensorBoard log dir: {log_dir}", flush=True)
+# paths
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.append(str(PROJECT_ROOT))
+
+
+print(PROJECT_ROOT)
+DATA_DIR = PROJECT_ROOT / "data"
+MODEL_DIR = PROJECT_ROOT / "models"
+OUT_DIR = PROJECT_ROOT / "outputs"
+
+from models.VanillaRNN import VanillaRNN
+
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}", flush=True)
@@ -18,59 +24,39 @@ if device.type == "cuda":
     print(f"CUDA version: {torch.version.cuda}", flush=True)
 
 
-class VanillaRNN(nn.Module):
-    # This method initializes the layers of the model:
-    def __init__(self, input_dim, hidden_dim, output_dim):
-        # super() alls the parent class constructor to set up the nn.Module infrastructure :
-        super().__init__()
-
-        self.rnn = nn.RNN(input_dim, hidden_dim, 4, batch_first=True)
-        # my module has an RNN "brain"
-        self.fc = nn.Linear(hidden_dim, output_dim)
-        # my NN module has a fully connected / dense layer
-        # -->i need this in the forward method to process the hidden state output from the RNN
-
-    """
-    forward() function is necessary in any nn.Module subclass.
-    It specifies how the input x moves through the layers of the model.
-    """
-
-    def forward(self, x):
-        out, _ = self.rnn(
-            x
-        )  # out contains the hidden states for each time step in the sequence
-        # _ cuz i didn't need the final hidden state. I use the one from last time step at each run
-        out = self.fc(out[:, -1, :])  # Use the last hidden state
-        return out
+test_data_file = DATA_DIR / "sst_test_set.pt"   #\\CHECK all data test + train in this dir?
+model_file = DATA_DIR / "rnn_moore.pt"
+output_file = OUT_DIR / "testset_results.pt"
 
 
-# paths
-data_file = "tests/sst_test_set.pt"
-model_file = "data/sst_train_set.pt"
-output_file = "tests/testset_results.pt"
-data = torch.load(data_file, map_location="cpu")
-model_loader = torch.load(model_file, map_location="cpu")
+data = torch.load(test_data_file, map_location=device)
+model_loader = torch.load(model_file, map_location=device)
+
+print("Top-level keys in model file:", model_loader.keys(), flush=True)
+
 # recuperate test data
-
 Xn = data["X"]
 X = Xn[:, :, 4]  # select only the central cell.
 
-Y = data["Y"]  # not normalized nut nan free.
+Y = data["Y"]  # not normalized but nan free.
 total_samples = X.shape[0]
+
+print(f"X has shape N= {X.shape}\n\n")
+print(f"Y has shape N= {Y.shape}\n\n")
 
 test_dataset = TensorDataset(X, Y)
 baseline_dataset = TensorDataset(Xn, Y)
 
-batch_size = 32
+batch_size = 256
 output_dim = 1
-input_dim = 1
+input_dim = 9
 hidden_dim = 7 * 8
 
 test_loader = DataLoader(test_dataset, batch_size, shuffle=True)
 baseline_loader = DataLoader(baseline_dataset, batch_size, shuffle=True)
 
 model = VanillaRNN(input_dim, hidden_dim, output_dim)
-model.load_state_dict(model_loader["model_state_dict"])
+model.load_state_dict(model_loader["rnnMoore_stateDict"])
 model = model.to(device)
 """
 print("=== Infos sur le modèle ===")
@@ -94,15 +80,11 @@ with torch.no_grad():
 print(f"Dummy input shape : {tuple(dummy.shape)}")
 print(f"Dummy output shape: {tuple(out.shape)}")
 """
-criterion = nn.MSELoss(reduction="sum")
-model.eval()
-
 total_samples = X.shape[0]
-model.eval()
+
 criterion = nn.MSELoss(reduction="sum")  # sum on GPU; divide later
 
 neigh_indices = [i for i in range(9) if i != 4]
-
 
 total_loss = torch.tensor(0.0, device=device)
 total_mare = torch.tensor(0.0, device=device)
@@ -112,6 +94,8 @@ num_mare = torch.tensor(0.0, device=device)  # count for MARE denom
 
 all_preds = []
 all_baselines = []
+
+model.eval()
 
 with torch.no_grad():
     for batch_seq, batch_tar in baseline_loader:
@@ -173,12 +157,6 @@ my_dict["baseline_mare"] = baseline_mare
 my_dict["num_samples"] = total_samples
 
 
-writer = SummaryWriter(log_dir="runs/test_aitems")
-writer.add_scalar("loss/test_rnn_mse", avg_mse)
-writer.add_scalar("loss/test_rnn_mare", avg_mare)
-writer.add_scalar("loss/test_rnn_baseline_mse", baseline_mse)
-writer.add_scalar("loss/test_rnn_baseline_mare", baseline_mare)
-
 
 # Concatenate all samples
 
@@ -187,4 +165,4 @@ my_dict["Y_baseline"] = torch.cat(all_baselines)
 my_dict["Y_true"] = Y
 
 torch.save(my_dict, output_file)
-writer.close()
+
