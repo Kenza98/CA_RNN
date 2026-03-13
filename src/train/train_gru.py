@@ -36,7 +36,7 @@ X, Y = data["X"], data["Y"]
 N = X.shape[0]  # nb of samples
 
 train_dataset = TensorDataset(X, Y)
-train_loader = DataLoader(train_dataset, batch_size=256, shuffle=True, num_workers=8)
+train_loader = DataLoader(train_dataset, batch_size=256, shuffle=True, num_workers=4)
 
 # if i already jave a GRU checkpoint, load it on cpu ?why?
 if model_file.exists():
