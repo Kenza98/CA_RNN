@@ -14,121 +14,62 @@ DATA_DIR = PROJECT_ROOT / "data"
 MODEL_DIR = PROJECT_ROOT / "models"
 OUT_DIR = PROJECT_ROOT / "outputs"
 
-from src.models.lstm import *
+from src.models.lstm import LSTM
+from src.models.VanillaRNN import VanillaRNN
+from src.utils.evaluate import evaluate_model, get_baseline
 
-#check if file was ran with --use-gpu + if cuda devise available
+# check if file was ran with --use-gpu + if cuda devise available
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}", flush=True)
 if device.type == "cuda":
     print(f"GPU name: {torch.cuda.get_device_name(0)}", flush=True)
     print(f"CUDA version: {torch.version.cuda}", flush=True)
 
-#same test file
+# LOAD DATA FILE, GET BASELINE
 
 test_data_file = (
     DATA_DIR / "sst_test_set.pt"
 )  # \\CHECK all data test + train in this dir?
 
-model_file = MODEL_DIR / "lstm_moore.pt"
+# load data on cpu
+test_data = torch.load(test_data_file, map_location="cpu")
+X = test_data["X"]
+Y = test_data["Y"]
+total_samples = Y.shape[0]
+test_dataset = TensorDataset(X, Y)
+test_loader = DataLoader(test_dataset, batch_size=256, shuffle=True)
 
+# LOAD MODEL FILE, GET MODELS TEST RESULTS
+model_file = MODEL_DIR / "lstm_moore.pt"
 output_file = OUT_DIR / "test_lstm_result.pt"
 
-#little check that i have the recently trained model
-timestamp = os.path.getmtime(model_file)
-#print("Last model update:", datetime.fromtimestamp(timestamp))
 
+# load the model checkpoint on disk (cpu)
 output_dim = 1
 input_dim = 9
 hidden_dim = 7 * 8
-
-
-#load the model checkpoint on disk (cpu)
 checkpoint = torch.load(model_file, map_location="cpu")
-#load data on cpu
-test_data = torch.load(test_data_file, map_location="cpu")
-
-X = test_data['X']
-Y = test_data['Y']
-
-total_samples = Y.shape[0]
-
-#print(f"Total number of samples : {total_samples}\n")
-#print(f"X shape:  {X.shape}\nY shape: {Y.shape}\n")
-
-#print(type(test_data))
-test_dataset = TensorDataset(X, Y)
-
-test_loader = DataLoader(test_dataset, batch_size=256, shuffle=True)
-
 model = LSTM(input_dim, hidden_dim, output_dim)
 model.load_state_dict(checkpoint["lstmMoore_stateDict"])
 model = model.to(device)
 
-#####loss_tensor = torch.tensor()  #to stack both losses (?) 
-
-#per sample loss will be recorded in two tensors
-sample_square_err = []  #sample square errors
-sample_absolute_err = []   #manhattan distance between prediction and target
-all_preds = []
-model.eval()  #better in the loop?
-
-with torch.no_grad():
-    #loop over batches
-    for batch_seq, batch_tar in test_loader:
-        #move the batch to gpu
-        batch_seq = batch_seq.to(device, non_blocking=True)
-        batch_tar = batch_tar.to(device, non_blocking=True)
-        #now batch and model are both running on cuda.
-        outputs = model(batch_seq)
-
-        sample_square_err.append(((outputs - batch_tar) ** 2).cpu())
-        sample_absolute_err.append(torch.abs(batch_tar - outputs).cpu())
-
-        all_preds.append(outputs)
-
-
-# === COMPUTING MAE ====
-ae_tensor = torch.cat(sample_absolute_err) #absolute errors concatenated into a tensor
-
-manhattan_dist = torch.sum(ae_tensor)  #sum of absolute errors (i.e., the Manhattan distance)
-
-mae = manhattan_dist / total_samples   #mean absolute error
-
-# === COMPUTING MSE ===
-se_tensor = torch.cat(sample_square_err)
-mse = torch.mean(se_tensor)
-
-# \\TODO === COMPUTING MEAN ABSOLUTE RELATIVE ERROR ===
-
 # === SAVING RESULTS TO PT FILE ===
-my_dict = dict()
-my_dict["squared_error"] = se_tensor.flatten()
-my_dict["absolute_error"] = ae_tensor.flatten()
-my_dict["lstm_prediction"] = torch.cat(all_preds).cpu().flatten()
+my_dict = evaluate_model(model, test_loader, device)
 torch.save(my_dict, output_file)
-
-print(f"\nMAE: {mae.item():.6f}")
-print(f"MSE: {mse.item():.6f}")
-print(f"Test results successfully written to file {output_file}\n")
-
-
-
-
-
-
-
-
-
+print("Saved {model.name()} evaluation")
 
 
 exit(0)
+
+# little check that i have the recently trained model
+# timestamp = os.path.getmtime(model_file)
+# print("Last model update:", datetime.fromtimestamp(timestamp))
 
 # === SHOWING QUANTILES ===
 quantiles = torch.tensor([0.0, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99, 1.0])
 print(ae_tensor.shape)
 
 print(f"flattened shape : {ae_flat.shape}\n")
-
 
 
 ae_q = torch.quantile(ae_flat, quantiles)
@@ -147,8 +88,3 @@ for q, v in zip(quantiles, se_q):
 quartiles = torch.tensor([0.25, 0.5, 0.75])
 print(torch.quantile(ae_tensor.flatten(), quartiles))
 print("RMSE: ", torch.sqrt(mse).item())
-
-
-
-
-

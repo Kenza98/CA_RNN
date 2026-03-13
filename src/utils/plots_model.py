@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 def plot_loss_per_epoch(train_loss, fp):
     ###
-    # train_loss : list of stored average epoch losses
+    # train_loss : list of stored AVERAGE epoch losses
     # out_dir : path to output directory
     ###
     

@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
-from .plots_model import *
+from src.utils.plots_model import *
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -14,7 +14,7 @@ MODEL_DIR = PROJECT_ROOT / "models"  #to save the trained model
 OUT_DIR = PROJECT_ROOT / "outputs"   #to save the plots post-training
 
 #lstm and rnn trained under identical conditions
-from .lstm import *  #imports the model class
+from src.models.lstm import *  #imports the model class
 
 # GPU usage if available
 parser = argparse.ArgumentParser()
@@ -32,7 +32,7 @@ model_file = MODEL_DIR / "lstm_moore.pt"
 # Load files
 data = torch.load(load_file, map_location="cpu")
 
-# If you already have an LSTM checkpoint, load it
+# If I already have an LSTM checkpoint, load it
 #conda → PyTorch → CUDA → GPU
 if model_file.exists():
     checkpoint = torch.load(model_file, map_location="cpu")

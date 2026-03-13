@@ -15,9 +15,7 @@ def evaluate_model(model, test_loader, device):
         for batch_seq, batch_tar in test_loader:
             batch_seq = batch_seq.to(device, non_blocking=True)
             batch_tar = batch_tar.to(device, non_blocking=True)
-
             outputs = model(batch_seq)
-
             sample_se.append(((outputs - batch_tar) ** 2).cpu())
             sample_ae.append(torch.abs(outputs - batch_tar).cpu())
             preds.append(outputs.cpu())
@@ -36,3 +34,68 @@ def evaluate_model(model, test_loader, device):
         "absolute_error": ae_tensor.flatten(),
         "prediction": pred_tensor.flatten()
     }
+
+
+
+def get_baseline(data_loader, device):
+    """this function computes a simple average of neighbors baseline"""
+    neigh_indices = [i for i in range(9) if i != 4] #4 is indice of central pixel
+    baselines = [] #instead of preds
+    baseline_se = []
+    baseline_ae = []
+    for batch_seq, batch_tar in data_loader:
+        #move to GPU
+        batch_seq = batch_seq.to(device)
+        batch_tar = batch_tar.to(device)
+        
+        #compute baseline as simple neighborhood average
+        neighbors_only = batch_seq[:, -1, neigh_indices]
+        batch_baseline = neighbors_only.mean(dim=1)
+        baselines.append(batch_baseline)
+
+        #compute absolute error
+        batch_ae = torch.abs(batch_baseline - batch_tar.squeeze(-1))
+        baseline_ae.append(batch_ae.cpu())
+
+        #compute square error
+        batch_se = torch.square(batch_baseline - batch_tar.squeeze(-1))
+        baseline_se.append(batch_se.cpu())
+
+    
+    baseline_tensor = torch.cat(baselines)
+    flat_baseline_tensor = baseline_tensor.flatten()
+    se_tensor = torch.cat(baseline_se)
+    ae_tensor = torch.cat(baseline_ae)
+
+    mse = torch.mean(se_tensor)
+    mae = torch.mean(ae_tensor)
+
+    return {
+        "mse" : mse, #baseline mse
+        "mae" : mae, #baseline mae
+        "squared_errors" : se_tensor.flatten(),
+        "absolute_errors" : ae_tensor.flatten(),
+        "baselines" : flat_baseline_tensor
+    }
+
+def quick_test_sanity(mse, mae, ae_tensor, se_tensor):
+    # === SHOWING QUANTILES ===
+    quantiles = torch.tensor([0.0, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99, 1.0])
+    
+    ae_q = torch.quantile(ae_tensor, quantiles)
+    se_q = torch.quantile(se_tensor, quantiles)
+
+    print("\n***Absolute Error Quantiles***")
+    for q, v in zip(quantiles, ae_q):
+        print(f"{q.item():>5.2f} : {v.item():.6f}")
+
+    print("\n***Squared Error Quantiles***")
+    for q, v in zip(quantiles, se_q):
+        print(f"{q.item():>5.2f} : {v.item():.6f}")
+
+    # ONLY QIUARTILES:
+    quartiles = torch.tensor([0.25, 0.5, 0.75])
+    print(torch.quantile(ae_tensor.flatten(), quartiles))
+    print("MSE: ", mse)
+    print("RMSE: ", torch.sqrt(mse).item())
+    print("MAE", mae, end='\n')
