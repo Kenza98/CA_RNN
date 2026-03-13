@@ -4,12 +4,15 @@ from pathlib import Path
 import argparse
 import torch.nn as nn
 import torch.optim as optim
-import time
+import time, os
+from datetime import datetime
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
 MODEL_DIR = PROJECT_ROOT / "models"
 OUT_DIR = PROJECT_ROOT / "outputs"
+
+
 
 from src.models.gru import GRU
 from src.utils.plots_model import plot_grad_hist, plot_loss_per_epoch
@@ -26,11 +29,18 @@ args = parser.parse_args()
 device = torch.device("cuda" if (args.use_gpu and torch.cuda.is_available()) else "cpu")
 print(f"Using device: {device}", flush=True)
 
-# Define paths
-load_file = DATA_DIR / "sst_train_set.pt"
-model_file = MODEL_DIR / "gru_moore.pt"
+#create name for pt file
+job_id = os.environ.get("SLURM_JOB_ID") #for gpu name
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S") #for cpu name
 
-# Load files
+if device.type == "cpu":
+    run_id = f"cpu_{timestamp}"
+else:
+    run_id = f"gpu_{job_id}"
+# Define paths
+
+# Load data
+load_file = DATA_DIR / "sst_train_set.pt"
 data = torch.load(load_file, map_location="cpu")
 X, Y = data["X"], data["Y"]
 N = X.shape[0]  # nb of samples
@@ -38,12 +48,6 @@ N = X.shape[0]  # nb of samples
 train_dataset = TensorDataset(X, Y)
 train_loader = DataLoader(train_dataset, batch_size=256, shuffle=True, num_workers=4)
 
-# if i already jave a GRU checkpoint, load it on cpu ?why?
-if model_file.exists():
-    checkpoint = torch.load(model_file, map_location="cpu")
-
-else:
-    checkpoint = {}
 
 # I/O dimensions
 nb_features = 9
@@ -59,9 +63,21 @@ hidden_dim = 7 * 8
 
 # GRU model
 model = GRU(input_dim, hidden_dim, output_dim, num_layers=1)
-model.to(device)
+model_class = model.__class__.__name__  # move this up here
+
+# if i already jave a GRU checkpoint, load it on cpu ?why?
+if device.type == "cpu":
+    run_is = f"cpu_{timestamp}"
+else:
+    run_id = f"gpu_{job_id}"
+    
+model_file = MODEL_DIR / f"{model_class.lower()}_{run_id}.pt"
+
+checkpoint = {}
+
 criterion = nn.MSELoss()
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+model.to(device)
 model.train()
 
 train_loss = []
@@ -104,18 +120,16 @@ for epoch in range(num_epochs):
     )
 
 # save model checkpoint
-checkpoint["gruMooreStateDict"] = model.state_dict()
-model_class = model.__class__.__name__
+
+checkpoint[f"{model_class}StateDict"] = model.state_dict()
 checkpoint["model_type"] = model_class
 
 torch.save(checkpoint, model_file)
 print(f"Model {model_class} successfully saved to {model_file}\n")
 
 # Plots
-save_path = OUT_DIR / "gru_train_loss.png"
+save_path = OUT_DIR / f"{model_class.lower()}_{run_id}_train_loss.png"
 plot_loss_per_epoch(train_loss, save_path)
 
-fp = OUT_DIR / "gru_grad.png"
+fp = OUT_DIR / f"{model_class.lower()}_{run_id}_grad.png"
 plot_grad_hist(grad_history, fp)
-
-print(f"Plots saved to {OUT_DIR}\n", flush=True)
