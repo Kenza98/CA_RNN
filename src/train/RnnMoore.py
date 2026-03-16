@@ -1,12 +1,12 @@
 import time
 import argparse
 from pathlib import Path
-from .plots_model import *  #\\TODO move the plots section to the test file?
+from src.utils.plots_model import *  #\\TODO move the plots section to the test file?
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
-from .VanillaRNN import *
+from models.VanillaRNN import *
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
