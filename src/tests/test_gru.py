@@ -47,7 +47,7 @@ my_dict = evaluate_model(model, test_loader, device)
 
 # ***SAVING RESULTS TO PT FILE***
 torch.save(my_dict, output_file)
-print(f"Saved {model.name()} evaluation\n")
+print(f"Saved {model.__class__.__name__} evaluation\n")
 
 # ***PRINT SOME QUANTILES***
 mse = my_dict["mse"]
