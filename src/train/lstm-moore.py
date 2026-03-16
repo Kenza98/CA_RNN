@@ -45,7 +45,7 @@ Y = data["Y"]
 
 train_dataset = TensorDataset(X, Y)
 
-train_loader = DataLoader(train_dataset, batch_size=256, shuffle=True, num_workers=8)
+train_loader = DataLoader(train_dataset, batch_size=256, shuffle=True, num_workers=4)
 
 # I/O dimensions
 nb_features = 9

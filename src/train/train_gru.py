@@ -64,7 +64,8 @@ hidden_dim = 7 * 8
 # GRU model
 model = GRU(input_dim, hidden_dim, output_dim, num_layers=1)
 model_class = model.__class__.__name__  # move this up here
-
+print(f"Model Class name is : {model_class}\n")
+exit(0)
 # if i already jave a GRU checkpoint, load it on cpu ?why?
 if device.type == "cpu":
     run_is = f"cpu_{timestamp}"

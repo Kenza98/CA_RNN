@@ -42,7 +42,7 @@ X = data["X"]  # moore neighborhood enriched TS already in sequence format
 Y = data["Y"]
 
 train_dataset = TensorDataset(X, Y)
-train_loader = DataLoader(train_dataset, batch_size=256, shuffle=True, num_workers=8)
+train_loader = DataLoader(train_dataset, batch_size=256, shuffle=True, num_workers=4)
 
 #I/O DIMs
 nb_features = 9  # (input dim)
