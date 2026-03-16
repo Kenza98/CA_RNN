@@ -56,7 +56,7 @@ baseline_dataset = TensorDataset(Xn, Y)
 
 batch_size = 256
 output_dim = 1
-input_dim = 9
+input_dim = 1
 hidden_dim = 7 * 8
 
 test_loader = DataLoader(test_dataset, batch_size, shuffle=True)
