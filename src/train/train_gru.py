@@ -57,7 +57,7 @@ output_dim = 1
 
 # Hyperparameters
 learning_rate = 1e-4
-num_epochs = 50
+num_epochs = 100
 hidden_dim = 7 * 8
 
 
