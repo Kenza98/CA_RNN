@@ -52,8 +52,8 @@ print(f"Saved {model.__class__.__name__} evaluation\n")
 # ***PRINT SOME QUANTILES***
 mse = my_dict["mse"]
 mae= my_dict["mae"]
-ae_tensor = my_dict["absolute_errors"]
-se_tensor = my_dict["squared_errors"]
+ae_tensor = my_dict["absolute_error"]
+se_tensor = my_dict["squared_error"]
 quick_test_sanity(mse, mae, ae_tensor, se_tensor)
 
 
