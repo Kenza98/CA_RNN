@@ -60,7 +60,6 @@ def get_baseline(data_loader, device):
         batch_se = torch.square(batch_baseline - batch_tar.squeeze(-1))
         baseline_se.append(batch_se.cpu())
 
-    
     baseline_tensor = torch.cat(baselines)
     flat_baseline_tensor = baseline_tensor.flatten()
     se_tensor = torch.cat(baseline_se)
@@ -77,11 +76,11 @@ def get_baseline(data_loader, device):
         "baselines" : flat_baseline_tensor
     }
 
-def quick_test_sanity(mse, mae, ae_tensor, se_tensor):
+def quick_test_sanity(tmse, tmae, ae_tensor, se_tensor):
     if isinstance(mse, torch.Tensor):
-        mse = mse.item()
+        mse = tmse.item()
     if isinstance(mae, torch.Tensor):
-        mae = mae.item()
+        mae = tmae.item()
     # === SHOWING QUANTILES ===
     quantiles = torch.tensor([0.0, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99, 1.0])
     
@@ -102,5 +101,5 @@ def quick_test_sanity(mse, mae, ae_tensor, se_tensor):
     for v in quartiles:
         print(f"{v.item():.6f}")
     print("MSE: ", mse)
-    print("RMSE: ", torch.sqrt(mse).item())
+    print("RMSE: ", torch.sqrt(tmse).item())
     print("MAE", mae, end='\n')
