@@ -60,8 +60,8 @@ output_dim = 1
 input_dim = 9
 hidden_dim = 7 * 8
 
-test_loader = DataLoader(test_dataset, batch_size, shuffle=True)
-baseline_loader = DataLoader(baseline_dataset, batch_size, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size, shuffle=False)
+baseline_loader = DataLoader(baseline_dataset, batch_size, shuffle=False)
 
 model = VanillaRNN(input_dim, hidden_dim, output_dim)
 model.load_state_dict(model_loader["rnnMoore_stateDict"])

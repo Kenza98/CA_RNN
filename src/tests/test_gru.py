@@ -27,7 +27,7 @@ test_data_file = DATA_DIR / "sst_test_set.pt"
 data = torch.load(test_data_file, map_location="cpu")
 X, Y = data["X"], data["Y"]
 test_dataset = TensorDataset(X, Y)
-test_loader = DataLoader(test_dataset, batch_size=256, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size=256, shuffle=False)
 
 # LOAD MODEL FILE, GET MODELS TEST RESULTS
 model_file = MODEL_DIR / "gru_moore.pt"

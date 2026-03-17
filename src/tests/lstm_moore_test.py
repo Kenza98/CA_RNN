@@ -37,7 +37,8 @@ X = test_data["X"]
 Y = test_data["Y"]
 total_samples = Y.shape[0]
 test_dataset = TensorDataset(X, Y)
-test_loader = DataLoader(test_dataset, batch_size=256, shuffle=True)
+#keep data unshuffled for reproducibility.
+test_loader = DataLoader(test_dataset, batch_size=256, shuffle=False)
 
 # LOAD MODEL FILE, GET MODELS TEST RESULTS
 model_file = MODEL_DIR / "lstm_moore.pt"
