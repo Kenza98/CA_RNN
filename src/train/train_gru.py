@@ -4,7 +4,8 @@ from pathlib import Path
 import argparse
 import torch.nn as nn
 import torch.optim as optim
-import time, os
+import os
+from src.utils.train_loop import train_model
 from datetime import datetime
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -48,25 +49,21 @@ N = X.shape[0]  # nb of samples
 train_dataset = TensorDataset(X, Y)
 train_loader = DataLoader(train_dataset, batch_size=256, shuffle=True, num_workers=4)
 
-
 # I/O dimensions
 nb_features = 9
 input_dim = nb_features
 output_dim = 1
 
-
 # Hyperparameters
 learning_rate = 1e-4
-num_epochs = 100
+num_epochs = 10
 hidden_dim = 7 * 8
-
 
 # GRU model
 model = GRU(input_dim, hidden_dim, output_dim, num_layers=1)
 model_class = model.__class__.__name__  # move this up here
 print(f"Model Class name is : {model_class}\n")
-exit(0)
-# if i already jave a GRU checkpoint, load it on cpu ?why?
+
 if device.type == "cpu":
     run_is = f"cpu_{timestamp}"
 else:
@@ -74,54 +71,14 @@ else:
     
 model_file = MODEL_DIR / f"{model_class.lower()}_{run_id}.pt"
 
-checkpoint = {}
+checkpoint = {} #start fresh each time train script is ran
 
 criterion = nn.MSELoss()
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-model.to(device)
-model.train()
 
-train_loss = []
-grad_history = {}
-
-for epoch in range(num_epochs):
-    print(f"Epoch {epoch+1}/{num_epochs}\ncomputing ...\n...\n...")
-    epoch_start = time.time()
-    epoch_loss = 0.0
-    for x_batch, y_batch in train_loader:
-        # move x and y to GPU
-        x_batch = x_batch.to(device)
-        y_batch = y_batch.to(device)
-        optimizer.zero_grad()  # reinitialize the gradients to avoid exploding (?)
-        y_pred = model(x_batch)  # one forward step
-        loss = criterion(y_pred, y_batch)
-        loss.backward()
-        with torch.no_grad():
-            for name, param in model.named_parameters():
-                if param.grad is not None:
-                    grad_norm = param.grad.norm().item()
-                    if name not in grad_history:
-                        grad_history[name] = []
-                    grad_history[name].append(grad_norm)
-        optimizer.step()
-        epoch_loss += loss.item()  # .cpu() ???
-
-    epoch_avg_loss = epoch_loss / N
-    train_loss.append(epoch_avg_loss)
-    epoch_time = time.time() - epoch_start
-    # GPU memory usage
-    if device == "cuda":
-        mem_alloc = torch.cuda.memory_allocated(device) / 1024**2
-        mem_reserved = torch.cuda.memory_reserved(device) / 1024**2
-        print(f"GPU Mem: {mem_alloc:.1f}MB/{mem_reserved:.1f}MB\n")
-    # Print epoch loss, time
-    print(
-        f"Loss: {epoch_avg_loss:.4f}\nTime: {epoch_time/60:.2f}min",
-        flush=True,
-    )
+train_loss, grad_history = train_model(model, train_loader, optimizer, criterion, num_epochs, device)
 
 # save model checkpoint
-
 checkpoint[f"{model_class}StateDict"] = model.state_dict()
 checkpoint["model_type"] = model_class
 
