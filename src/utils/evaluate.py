@@ -53,7 +53,7 @@ def get_baseline(data_loader, device):
         baselines.append(batch_baseline)
 
         #compute absolute error
-        batch_ae = torch.abs(batch_baseline - batch_tar.squeeze(-1))
+        batch_ae = torch.abs(batch_baseline - batch_ta  r.squeeze(-1))
         baseline_ae.append(batch_ae.cpu())
 
         #compute square error
@@ -77,9 +77,9 @@ def get_baseline(data_loader, device):
     }
 
 def quick_test_sanity(tmse, tmae, ae_tensor, se_tensor):
-    if isinstance(mse, torch.Tensor):
+    if isinstance(tmse, torch.Tensor):
         mse = tmse.item()
-    if isinstance(mae, torch.Tensor):
+    if isinstance(tmae, torch.Tensor):
         mae = tmae.item()
     # === SHOWING QUANTILES ===
     quantiles = torch.tensor([0.0, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99, 1.0])
