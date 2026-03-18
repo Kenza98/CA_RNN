@@ -1,6 +1,6 @@
 import torch
 from torch.utils.data import TensorDataset, DataLoader
-import os, sys
+import os,sys
 from pathlib import Path
 from datetime import datetime
 from src.utils.evaluate import get_baseline
@@ -25,9 +25,6 @@ if device.type == "cuda":
 # LOAD BASELINE FILE
 baseline_file = OUT_DIR / "baselines.pt"
 
-# little check that i have the recently trained model
-timestamp = os.path.getmtime(baseline_file)
-print("Last baseline update:", datetime.fromtimestamp(timestamp))
 
 #LOAD DATA FILE
 data_file = DATA_DIR / "sst_test_set.pt"
@@ -37,13 +34,15 @@ test_data = torch.load(data_file, map_location="cpu")
 X = test_data["X"]
 Y = test_data["Y"]
 total_samples = Y.shape[0]
+#print(f"Total samples: {total_samples}\n")
+#exit(0)
 test_dataset = TensorDataset(X, Y)
 #keep data unshuffled for reproducibility.
 data_loader = DataLoader(test_dataset, batch_size=256, shuffle=False)
 
 # === SAVING RESULTS TO PT FILE ===
 my_dict = get_baseline(data_loader, device)
-#torch.save(my_dict, baseline_file)
+torch.save(my_dict, baseline_file)
 
 for k, v in my_dict.items():
     print(f"{k}: {type(v)}, {v.shape if hasattr(v, 'shape') else v}")
