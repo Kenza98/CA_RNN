@@ -17,7 +17,7 @@ parser.add_argument(
 args = parser.parse_args()
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 OUT_DIR = PROJECT_ROOT / "data" # the outputs are the model outputs
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -30,8 +30,8 @@ def load_dataset(chunk_size=200):
         maximum_longitude=16,
         minimum_latitude=44.5,
         maximum_latitude=45.5,
-        start_datetime="2023-01-01",
-        end_datetime="2025-12-31",
+        start_datetime="2025-01-01",
+        end_datetime="2026-02-28",
     )
 
     return ds.chunk({"time": chunk_size})
@@ -85,9 +85,23 @@ def build_learning_set(ds, seq_length=4, chunk_size=200, use_gpu=False):
             Y_t = target_map[1:-1, 1:-1].contiguous().view(-1, 1)
 
             # handle NaNs
-
-            X_t = torch.nan_to_num(X_t, nan=global_mean) #CHECK ince this is done \downarrow
-            Y_t = torch.nan_to_num(Y_t, nan=global_mean)
+            """
+            one nan in neighbors -> kills the sequence step
+            one bad sequence step -> kills the whole sample
+            """
+            nan_in_neighbors = torch.isnan(X_t).any(dim=-1).any(dim=-1)
+            nan_in_target = torch.isnan(Y_t).squeeze(-1)
+            """
+            an invalid x,y if either x or y are nan
+            """
+            invalid_mask = nan_in_neighbors | nan_in_target
+            valid_mask = ~invalid_mask
+            X_t = X_t[valid_mask]
+            Y_t = Y_t[valid_mask]
+            assert not torch.isnan(X_t).any(), "NaNs still present in X_t after masking!"
+            assert not torch.isnan(Y_t).any(), "NaNs still present in Y_t after masking!"
+            #X_t = torch.nan_to_num(X_t, nan=global_mean)
+            #Y_t = torch.nan_to_num(Y_t, nan=global_mean)
  
             X_chunks.append(X_t)
             Y_chunks.append(Y_t)
@@ -117,7 +131,7 @@ def main():
 
     print(f"X shape: {X_train.shape}, Y shape: {Y_train.shape}", flush=True)
 
-    output_filepath = OUT_DIR / "sst_train_set.pt"
+    output_filepath = OUT_DIR / "sst_test_set.pt"
 
     torch.save(
         {"X": X_train, "Y": Y_train},
