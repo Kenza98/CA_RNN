@@ -53,7 +53,7 @@ def get_baseline(data_loader, device):
         baselines.append(batch_baseline)
 
         #compute absolute error
-        batch_ae = torch.abs(batch_baseline - batch_ta  r.squeeze(-1))
+        batch_ae = torch.abs(batch_baseline - batch_tar.squeeze(-1))
         baseline_ae.append(batch_ae.cpu())
 
         #compute square error
