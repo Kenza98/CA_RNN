@@ -130,7 +130,7 @@ def main():
     )
 
     print(f"X shape: {X_train.shape}, Y shape: {Y_train.shape}", flush=True)
-
+    """
     output_filepath = OUT_DIR / "sst_test_set.pt"
 
     torch.save(
@@ -140,8 +140,9 @@ def main():
 
     print(f"Saved: {output_filepath}", flush=True)
 
+    
+    """
     ds.close()
-
 
 if __name__ == "__main__":
     main()
