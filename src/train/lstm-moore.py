@@ -26,7 +26,7 @@ device = torch.device("cuda" if (args.use_gpu and torch.cuda.is_available()) els
 print(f"Using device: {device}", flush=True)
 
 # Define paths
-load_file = DATA_DIR / "sst_test_set.pt"
+load_file = DATA_DIR / "sst_train_set.pt"
 model_file = MODEL_DIR / "lstm_moore.pt"
 
 # Load files
@@ -36,7 +36,9 @@ data = torch.load(load_file, map_location="cpu")
 #conda → PyTorch → CUDA → GPU
 if model_file.exists():
     checkpoint = torch.load(model_file, map_location="cpu")
-    print(type(checkpoint))
+    print(f"Last model checkpoint: {type(checkpoint)}\nLoading...\n")
+    print("Done.")
+
 else:
     checkpoint = {}
 
@@ -44,7 +46,6 @@ X = data["X"]   # moore neighborhood enriched TS already in sequence format
 Y = data["Y"]
 
 train_dataset = TensorDataset(X, Y)
-
 train_loader = DataLoader(train_dataset, batch_size=256, shuffle=True, num_workers=4)
 
 # I/O dimensions
