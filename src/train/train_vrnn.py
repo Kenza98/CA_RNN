@@ -10,8 +10,6 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 from src.models.VanillaRNN import *
 
-
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
 MODEL_DIR = PROJECT_ROOT / "models"
