@@ -5,12 +5,20 @@ from pathlib import Path
 from src.utils.evaluate import *
 # paths
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-# sys.path.append(str(PROJECT_ROOT))
-# print(PROJECT_ROOT)
+#sys.path.append(str(PROJECT_ROOT))
+#print(PROJECT_ROOT)
 
 DATA_DIR = PROJECT_ROOT / "data"
 MODEL_DIR = PROJECT_ROOT / "models"
 OUT_DIR = PROJECT_ROOT / "outputs"
+
+file_name = "test_gru_result.pt"
+output_file = OUT_DIR / file_name
+
+### CHECK IF TESTS EXIST ###
+if output_file.exists():
+    print(f"Tests already ran and saved to {file_name}.\nExiting.\n")
+    exit(0)
 
 from src.models.gru import GRU
 from src.utils.evaluate import evaluate_model
@@ -30,8 +38,9 @@ test_dataset = TensorDataset(X, Y)
 test_loader = DataLoader(test_dataset, batch_size=256, shuffle=False)
 
 # LOAD MODEL FILE, GET MODELS TEST RESULTS
-model_file = MODEL_DIR / "gru_moore.pt"
-output_file = OUT_DIR / "test_gru_result.pt"
+#model_file = MODEL_DIR / "gru_moore.pt"
+model_file = MODEL_DIR / "gru_gpu_43125.pt"
+
 
 # load the model checkpoint on disk (cpu)
 output_dim = 1
@@ -39,7 +48,8 @@ input_dim = 9
 hidden_dim = 7 * 8
 checkpoint = torch.load(model_file, map_location="cpu")
 model = GRU(input_dim, hidden_dim, output_dim)
-model.load_state_dict(checkpoint["gruMooreStateDict"])
+
+model.load_state_dict(checkpoint["GRUStateDict"])
 model = model.to(device)
 
 # ***GETTING RESULTS WITH HELPER FCT***
@@ -56,4 +66,7 @@ ae_tensor = my_dict["absolute_error"]
 se_tensor = my_dict["squared_error"]
 quick_test_sanity(mse, mae, ae_tensor, se_tensor)
 
-
+'''
+print(checkpoint.keys())
+exit(0)
+'''
