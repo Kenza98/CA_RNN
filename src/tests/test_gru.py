@@ -12,13 +12,13 @@ DATA_DIR = PROJECT_ROOT / "data"
 MODEL_DIR = PROJECT_ROOT / "models"
 OUT_DIR = PROJECT_ROOT / "outputs"
 
-file_name = "gru_gpu_44122.pt"
+file_name = "gru_gpu_43125.pt"
 output_file = OUT_DIR / file_name
 
 ### CHECK IF TESTS EXIST ###
-if output_file.exists():
-    print(f"Tests already ran and saved to {file_name}.\nExiting.\n")
-    exit(0)
+# if output_file.exists():
+#     print(f"Tests already ran and saved to {file_name}.\nExiting.\n")
+#     exit(0)
 
 from src.models.gru import GRU
 from src.utils.evaluate import evaluate_model
@@ -50,7 +50,7 @@ checkpoint = torch.load(model_file, map_location="cpu")
 model = GRU(input_dim, hidden_dim, output_dim)
 
 model.load_state_dict(checkpoint["GRUStateDict"])
-model = model.to(device)
+
 
 # ***GETTING RESULTS WITH HELPER FCT***
 my_dict = evaluate_model(model, test_loader, device)
