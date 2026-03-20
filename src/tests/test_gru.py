@@ -12,7 +12,7 @@ DATA_DIR = PROJECT_ROOT / "data"
 MODEL_DIR = PROJECT_ROOT / "models"
 OUT_DIR = PROJECT_ROOT / "outputs"
 
-file_name = "test_gru_result.pt"
+file_name = "gru_gpu_44122.pt"
 output_file = OUT_DIR / file_name
 
 ### CHECK IF TESTS EXIST ###
