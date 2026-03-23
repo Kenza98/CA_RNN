@@ -10,7 +10,6 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(PROJECT_ROOT))
 #imports that need project root
 from src.models.lstm import LSTM
-from src.models.VanillaRNN import VanillaRNN
 from src.utils.evaluate import evaluate_model, quick_test_sanity
 ####
 #continue defining more paths...
@@ -39,7 +38,7 @@ else:
     model_file = PROJECT_ROOT / args.model_file
 
 
-# check if file was ran with --use-gpu + if cuda devise available
+# check if cuda devise available
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}", flush=True)
 if device.type == "cuda":
