@@ -58,33 +58,9 @@ test_dataset = TensorDataset(X, Y)
 # keep data unshuffled for reproducibility.
 test_loader = DataLoader(test_dataset, batch_size=256, shuffle=False)
 
-# LOAD MODEL FILE, GET MODELS TEST RESULTS
-# ask user which model file to use
-print("Enter 0 to use the most recent model file, or enter the model filename (e.g. lstm_gpu_44121.pt):")
-user_input = input("> ").strip()
 
-if user_input == "0":
-    pattern = re.compile(r"^lstm_gpu.*\.pt$") # r " " is raw string
-    pt_files = sorted(
-        [f for f in MODEL_DIR.iterdir() if pattern.match(f.name)],
-        key=os.path.getmtime
-    )
-    if not pt_files:
-        raise FileNotFoundError(f"No matching lstm_gpu*.pt files found in {MODEL_DIR}")
-    model_file = pt_files[-1]
-    print(f"Using most recent model: {model_file.name}")
-else:
-    model_file = MODEL_DIR / user_input
-    if not model_file.exists():
-        raise FileNotFoundError(f"Model file not found: {model_file}")
-    print(f"Using model: {model_file.name}")
-
-
-#model_file = MODEL_DIR / "lstm_gpu_44121.pt"
 timestamp = os.path.getmtime(model_file)
 print("Last model update date: ", datetime.fromtimestamp(timestamp))
-
-
 
 # load the model checkpoint on disk (cpu)
 output_dim = 1
