@@ -5,11 +5,12 @@ def evaluate_model(model, test_loader, device):
     # This function returns the dictionary of results for a trained model checkpoint
     #
     """
+    model = model.to(device)
+    model.eval()
+
     sample_se = []
     sample_ae = []
     preds = []
-
-    model.eval()
 
     with torch.no_grad():
         for batch_seq, batch_tar in test_loader:
@@ -71,8 +72,8 @@ def get_baseline(data_loader, device):
     return {
         "mse" : mse, #baseline mse
         "mae" : mae, #baseline mae
-        "squared_errors" : se_tensor.flatten(),
-        "absolute_errors" : ae_tensor.flatten(),
+        "squared_error" : se_tensor.flatten(),
+        "absolute_error" : ae_tensor.flatten(),
         "baselines" : flat_baseline_tensor
     }
 
@@ -95,7 +96,7 @@ def quick_test_sanity(tmse, tmae, ae_tensor, se_tensor):
     for q, v in zip(quantiles, se_q):
         print(f"{q.item():>5.2f} : {v.item():.6f}")
 
-    # ONLY QIUARTILES:
+    # ONLY QUARTILES:
     quartiles = torch.tensor([0.25, 0.5, 0.75])
     print(torch.quantile(ae_tensor.flatten(), quartiles))
     for v in quartiles:

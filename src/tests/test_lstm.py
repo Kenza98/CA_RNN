@@ -66,7 +66,7 @@ print("Last model update date: ", datetime.fromtimestamp(timestamp))
 output_dim = 1
 input_dim = 9
 hidden_dim = 7 * 8
-checkpoint = torch.load(model_file, map_location="cpu")
+checkpoint = torch.load(model_file, map_location=device)
 
 print("Top-level keys in model file:", checkpoint.keys(), flush=True)
 
