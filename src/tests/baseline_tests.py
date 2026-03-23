@@ -3,7 +3,7 @@ from torch.utils.data import TensorDataset, DataLoader
 import os,sys
 from pathlib import Path
 from datetime import datetime
-from src.utils.evaluate import get_baseline
+from src.utils.evaluate import get_baseline, quick_test_sanity
 
 # paths
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -42,10 +42,18 @@ data_loader = DataLoader(test_dataset, batch_size=256, shuffle=False)
 
 # === SAVING RESULTS TO PT FILE ===
 my_dict = get_baseline(data_loader, device)
-torch.save(my_dict, baseline_file)
+#
+
+# ***PRINT SOME QUANTILES***
+mse = my_dict["mse"]
+mae= my_dict["mae"]
+ae_tensor = my_dict["absolute_error"]
+se_tensor = my_dict["squared_error"]
+quick_test_sanity(mse, mae, ae_tensor, se_tensor)
+
 
 for k, v in my_dict.items():
     print(f"{k}: {type(v)}, {v.shape if hasattr(v, 'shape') else v}")
 
-
+torch.save(my_dict, baseline_file)
 print("Saved baseline evaluation.", end="\n")

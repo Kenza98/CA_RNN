@@ -4,7 +4,7 @@ import os, sys
 from pathlib import Path
 
 # paths
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(PROJECT_ROOT))
 print(PROJECT_ROOT)
 
@@ -148,6 +148,24 @@ def plot_mse_boxplot(model_sample_error, baseline_sample_error, fp):
     fig.savefig(fp, dpi=150, bbox_inches="tight")
     plt.close(fig)
 
+def mse_boxplot_all(model1_mse, model2_mse, model3_mse, model4_mse, fp):
+    fig,axes = plt.subplots()
+    axes.boxplot([
+        model1_mse,
+        model2_mse,
+        model3_mse,
+        model4_mse
+    ],
+    tick_labels=["Baseline", "Vanilla RNN", "LSTM", "GRU"],
+    showfliers=False,
+    )
+    axes.set_title("Models")
+    axes.set_ylabel("Squared Error")
+    axes.grid(True, axis="y", linestyle="--", alpha=.5)
+    #fig.suptitle("Error Distribution: Baseline vs Model")
+    fig.savefig(fp, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
 def plot_mare_boxplot(model_sample_error, baseline_sample_error, fp):
     fig,axes = plt.subplots()
     axes.boxplot([
@@ -164,9 +182,7 @@ def plot_mare_boxplot(model_sample_error, baseline_sample_error, fp):
     fig.savefig(fp, dpi=150, bbox_inches="tight")
     plt.close(fig)
 
-
-
-def main():
+def old_main():
     output_file = OUT_DIR / "testset_results.pt"
     results = torch.load(output_file, map_location="cpu")
 
@@ -184,7 +200,6 @@ def main():
 
     mse_vals = [baseline_mse, mse]
     mare_vals = [baseline_mare, mare]
-
     # print(f"Average MSE: {mse:.4f}, Average MARE: {mare:.4f}")
     # print(f"Baseline MSE: {baseline_mse:.4f}, Baseline MARE: {baseline_mare:.4f}")
 
@@ -203,7 +218,18 @@ def main():
     mare_boxplot = OUT_DIR / "vrnn_mare_boxplot.png"
     plot_mare_boxplot(mare_model_all, mare_baseline_all, mare_boxplot)
 
+def main():
+    dict1 = torch.load(OUT_DIR / "test_vrnn_result.pt")
+    dict2 =  torch.load(OUT_DIR / "test_lstm_result.pt")
+    dict3 =  torch.load(OUT_DIR / "test_gru_result.pt")
+    dict_baseline =  torch.load(OUT_DIR / "baselines.pt")
 
+    m1 = dict1["squared_error"]
+    m2 = dict2["squared_error"]
+    m3 = dict3["squared_error"]
+    baseline = dict_baseline["squared_error"]
+
+    mse_boxplot_all(m1, m2, m3, baseline, OUT_DIR / "boxplot_all")
 
 
 if __name__ == "__main__":
