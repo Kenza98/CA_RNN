@@ -3,19 +3,40 @@ from torch.utils.data import TensorDataset, DataLoader
 import os, sys
 from pathlib import Path
 from datetime import datetime
-from src.models.lstm import LSTM
-from src.models.VanillaRNN import VanillaRNN
-from src.utils.evaluate import evaluate_model, quick_test_sanity
 import re
-
+import argparse
 # paths
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(PROJECT_ROOT))
-print(PROJECT_ROOT)
-
+#imports that need project root
+from src.models.lstm import LSTM
+from src.models.VanillaRNN import VanillaRNN
+from src.utils.evaluate import evaluate_model, quick_test_sanity
+####
+#continue defining more paths...
 DATA_DIR = PROJECT_ROOT / "data"
 MODEL_DIR = PROJECT_ROOT / "models"
 OUT_DIR = PROJECT_ROOT / "outputs" / "shuffle_True_ep100"
+OUT_DIR.mkdir(parents=True, exist_ok=True)
+
+#get the model file
+parser = argparse.ArgumentParser()
+parser.add_argument("--model-file", type=str, default=None,
+                    help="Path to .pt file, e.g. models/lstm_gpu_44121.pt. If not provided, uses most recent lstm_gpu*.pt in MODEL_DIR.")
+args = parser.parse_args()
+
+if args.model_file is None:
+    # fall back to most recent lstm_gpu*.pt
+    pattern = re.compile(r"^lstm_gpu.*\.pt$")
+    pt_files = sorted(
+        [f for f in MODEL_DIR.iterdir() if pattern.match(f.name)],
+        key=lambda f: f.stat().st_mtime
+    )
+    if not pt_files:
+        raise FileNotFoundError(f"No matching lstm_gpu*.pt files found in {MODEL_DIR}")
+    model_file = pt_files[-1]
+else:
+    model_file = PROJECT_ROOT / args.model_file
 
 
 # check if file was ran with --use-gpu + if cuda devise available
