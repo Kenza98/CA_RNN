@@ -1,27 +1,41 @@
 import torch
 from torch.utils.data import TensorDataset, DataLoader
-import sys
+import sys, os, re
 from pathlib import Path
-from src.utils.evaluate import *
+import argparse
 # paths
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-#sys.path.append(str(PROJECT_ROOT))
-#print(PROJECT_ROOT)
-
+sys.path.append(str(PROJECT_ROOT))
+#imports that need project root
+from src.models.gru import GRU
+from src.utils.evaluate import evaluate_model, quick_test_sanity
+####
+#continue defining more paths...
 DATA_DIR = PROJECT_ROOT / "data"
 MODEL_DIR = PROJECT_ROOT / "models"
-OUT_DIR = PROJECT_ROOT / "outputs"
+OUT_DIR = PROJECT_ROOT / "outputs" / "shuffle_True_ep100"
+OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-file_name = "gru_gpu_43125.pt"
-output_file = OUT_DIR / file_name
+#get the model file
+parser = argparse.ArgumentParser()
+parser.add_argument("--model-file", type=str, default=None,
+                    help="Path to .pt file, e.g. models/gru_gpu_44121.pt. If not provided, uses most recent gru_gpu*.pt in MODEL_DIR.")
+args = parser.parse_args()
 
-### CHECK IF TESTS EXIST ###
-# if output_file.exists():
-#     print(f"Tests already ran and saved to {file_name}.\nExiting.\n")
-#     exit(0)
+if args.model_file is None:
+    # fall back to most recent gru_gpu*.pt
+    pattern = re.compile(r"^gru_gpu.*\.pt$")
+    pt_files = sorted(
+        [f for f in MODEL_DIR.iterdir() if pattern.match(f.name)],
+        key=lambda f: f.stat().st_mtime
+    )
+    if not pt_files:
+        raise FileNotFoundError(f"No matching gru_gpu*.pt files found in {MODEL_DIR}")
+    model_file = pt_files[-1]
+else:
+    model_file = PROJECT_ROOT / args.model_file
 
-from src.models.gru import GRU
-from src.utils.evaluate import evaluate_model
+
 
 # check if file was ran with --use-gpu + if cuda devise available
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -37,27 +51,25 @@ X, Y = data["X"], data["Y"]
 test_dataset = TensorDataset(X, Y)
 test_loader = DataLoader(test_dataset, batch_size=256, shuffle=False)
 
-# LOAD MODEL FILE, GET MODELS TEST RESULTS
-#model_file = MODEL_DIR / "gru_moore.pt"
-model_file = MODEL_DIR / "gru_gpu_43125.pt"
-
 
 # load the model checkpoint on disk (cpu)
 output_dim = 1
 input_dim = 9
 hidden_dim = 7 * 8
-checkpoint = torch.load(model_file, map_location="cpu")
+checkpoint = torch.load(model_file, map_location=device)
 model = GRU(input_dim, hidden_dim, output_dim)
 
 model.load_state_dict(checkpoint["GRUStateDict"])
-
+model_class = model.__class__.__name__
 
 # ***GETTING RESULTS WITH HELPER FCT***
 my_dict = evaluate_model(model, test_loader, device)
 
 # ***SAVING RESULTS TO PT FILE***
-torch.save(my_dict, output_file)
-print(f"Saved {model.__class__.__name__} evaluation\n")
+file_name = "test_gru_result.pt"
+fp = OUT_DIR / file_name
+torch.save(my_dict, fp)
+print(f"Saved {model_class} evaluation\n")
 
 # ***PRINT SOME QUANTILES***
 mse = my_dict["mse"]
@@ -65,8 +77,3 @@ mae= my_dict["mae"]
 ae_tensor = my_dict["absolute_error"]
 se_tensor = my_dict["squared_error"]
 quick_test_sanity(mse, mae, ae_tensor, se_tensor)
-
-'''
-print(checkpoint.keys())
-exit(0)
-'''
