@@ -79,7 +79,8 @@ my_dict = evaluate_model(model, test_loader, device)
 # SAVING RESULTS TO PT FILE
 output_file = OUT_DIR / "test_lstm_result.pt"
 torch.save(my_dict, output_file)
-print(f"Saved {model.name()} evaluation")
+model_class = model.__class__.__name__
+print(f"Saved {model_class} evaluation")
 
 
 # ***PRINT SOME QUANTILES***
