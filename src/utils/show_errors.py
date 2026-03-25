@@ -20,7 +20,7 @@ lf = find_result_file(r".*lstm.*\.pt$")  # baseline file
 gf = find_result_file(r".*gru.*\.pt$")  # baseline file
 vf = find_result_file(r".*vrnn.*\.pt$")  # baseline file
 
-# print(f"The files :\n1. {bf}\n2. {lf}\n3. {gf}\n4. {vf}\n\n-----------------\n\n")
+print(f"The files :\n1. {bf}\n2. {lf}\n3. {gf}\n4. {vf}\n\n-----------------\n\n")
 
 baseline = torch.load(bf, weights_only=False)
 vanilla_rnn = torch.load(vf, weights_only=False)
@@ -30,7 +30,7 @@ gru = torch.load(gf, weights_only=False)
 abs_errs = [baseline["mae"], vanilla_rnn["mae"], lstm["mae"], gru["mae"]]
 
 labels = ["Baseline MAE = ", "Vanilla MAE = ", "LSTM MAE = ", "GRU MAE = "]
-
+print("Mean Absolute Error :")
 for l, e in zip(labels, abs_errs):
     print(f"{l} : {e}\n")
 
@@ -42,19 +42,15 @@ ae_tensors = [
 ]
 
 min_ae = [torch.min(t).item() for t in ae_tensors]
+print("Minimum Absolute Error :")
 
 for l, e in zip(labels, min_ae):
     print(f"{l} : {e}\n")
 
 
 max_ae = [torch.max(t).item() for t in ae_tensors]
+print("Maximum Absolute Error :")
 
 for l, e in zip(labels, max_ae):
     print(f"{l} : {e}\n")
 
-
-
-"""
-for e in E:
-    print(f"{e.keys()}\n")
-"""
