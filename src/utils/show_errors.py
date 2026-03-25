@@ -2,7 +2,7 @@ import torch
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-OUT_DIR = PROJECT_ROOT / "outputs"
+OUT_DIR = PROJECT_ROOT / "outputs/shuffle_True_ep100"
 
 # loading error dicts for each model
 baseline = torch.load(OUT_DIR / "baselines.pt")  # file, not dict... yet?
