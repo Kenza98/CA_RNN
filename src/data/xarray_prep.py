@@ -22,7 +22,7 @@ OUT_DIR = PROJECT_ROOT / "data"  # data folder at project root
 OUT_DIR.mkdir(parents=True, exist_ok=True)  # always play it safe.
 
 
-def load_dataset(start_date, end_date, chunk_size=200):
+def load_dataset(chunk_size=200):
     ds = copernicusmarine.open_dataset(
         dataset_id="cmems_mod_med_phy-temp_my_4.2km_P1D-m",
         variables=["thetao"],
@@ -30,8 +30,8 @@ def load_dataset(start_date, end_date, chunk_size=200):
         maximum_longitude=16,
         minimum_latitude=44.5,
         maximum_latitude=45.5,
-        start_datetime=start_date,  # "2025-01-01"
-        end_datetime=end_date,  # "2026-02-28"
+        start_datetime="2025-01-01",  # "2025-01-01"
+        end_datetime="2026-02-28",  # "2026-02-28"
     )
     result = ds.chunk({"time": chunk_size})
     print(type(result))
@@ -132,7 +132,7 @@ def build_learning_set(ds, seq_length=4, chunk_size=200, use_gpu=False):
 def main():
     sd = date(2025, 1, 1)
     ed = date(2026, 2, 28)
-    ds = load_dataset(sd, ed, chunk_size=200)  # just loads the dataset from copernicus
+    ds = load_dataset(chunk_size=200)  # just loads the dataset from copernicus
 
     X_train, Y_train = build_learning_set(
         ds,
