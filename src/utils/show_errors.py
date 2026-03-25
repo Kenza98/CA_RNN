@@ -27,12 +27,31 @@ vanilla_rnn = torch.load(vf, weights_only=False)
 lstm = torch.load(lf, weights_only=False)
 gru = torch.load(gf, weights_only=False)
 
-errs = [baseline["mae"], vanilla_rnn["mae"], lstm["mae"], gru["mae"]]
+abs_errs = [baseline["mae"], vanilla_rnn["mae"], lstm["mae"], gru["mae"]]
 
 labels = ["Baseline MAE = ", "Vanilla MAE = ", "LSTM MAE = ", "GRU MAE = "]
 
-for l, e in zip(labels, errs):
+for l, e in zip(labels, abs_errs):
     print(f"{l} : {e}\n")
+
+ae_tensors = [
+    baseline["absolute_error"],
+    vanilla_rnn["absolute_error"],
+    lstm["absolute_error"],
+    gru["absolute_error"]
+]
+
+min_ae = [torch.min(t).item() for t in ae_tensors]
+
+for l, e in zip(labels, min_ae):
+    print(f"{l} : {e}\n")
+
+
+max_ae = [torch.max(t).item() for t in ae_tensors]
+
+for l, e in zip(labels, max_ae):
+    print(f"{l} : {e}\n")
+
 
 
 """
