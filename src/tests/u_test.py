@@ -14,8 +14,14 @@ def find_result_file(pattern_str):
         raise FileNotFoundError(f"No file matching '{pattern_str}' in {OUT_DIR}")
     return sorted(files, key=lambda f: f.stat().st_mtime)[-1]
 
-def show_quartiles():
-    return
+def show_quartiles(err_tensor):
+    # computes quartiles and returns them + shows them
+    quartiles = torch.tensor([0.25, 0.5, 0.75])
+    print(torch.quantile(err_tensor.flatten(), quartiles))
+    for v in quartiles:
+        print(f"{v.item():.6f}")
+
+
 
 #loading error dicts for baseline
 bf=find_result_file(r".*baseline.*\.pt$") #baseline file
@@ -39,11 +45,10 @@ gru_err = gru["absolute_error"].cpu().numpy()
 
 #showing quartiles
 
+Err = baseline_err, vanilla_err, lstm_err, gru_err
 
-
-
-
-
+for e in Err:
+    show_quartiles(e)
 
 exit(0)
 
