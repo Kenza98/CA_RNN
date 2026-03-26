@@ -52,9 +52,7 @@ for e in Err:
 
 exit(0)
 
-for e in Err:
-    e = e.numpy()
-
+baseline_err, vanilla_err, lstm_err, gru_err = [e.numpy() for e in Err] #this modifies the original variables
 
 
 """
