@@ -46,9 +46,10 @@ gru_err = gru["absolute_error"].cpu()
 #showing quartiles
 
 Err = baseline_err, vanilla_err, lstm_err, gru_err
-
-for e in Err:
-    show_quartiles(e)
+labels = "Baseline", "Vanilla RNN", "LSTM", "GRU"
+for l, e in zip(labels, Err):
+    print(f"Error quartiles for {l} : {show_quartiles(e)}\n")
+    
 
 exit(0)
 
