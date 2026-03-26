@@ -38,10 +38,10 @@ L = bf, vf, lf, gf
 print(f"Successfully loaded all file : {L}\n")
 
 #start with getting a numpy array from the baseline
-baseline_err = baseline["absolute_error"].cpu().numpy()
-vanilla_err = vanilla_rnn["absolute_error"].cpu().numpy()
-lstm_err = lstm["absolute_error"].cpu().numpy()
-gru_err = gru["absolute_error"].cpu().numpy()
+baseline_err = baseline["absolute_error"].cpu()
+vanilla_err = vanilla_rnn["absolute_error"].cpu()
+lstm_err = lstm["absolute_error"].cpu()
+gru_err = gru["absolute_error"].cpu()
 
 #showing quartiles
 
@@ -52,7 +52,8 @@ for e in Err:
 
 exit(0)
 
-
+for e in Err:
+    e = e.numpy()
 
 
 
