@@ -19,7 +19,7 @@ def show_quartiles(err_tensor):
     quartiles = torch.tensor([0.25, 0.5, 0.75])
     values = torch.quantile(err_tensor.flatten(), quartiles)
     for q, v in zip(quartiles, values):
-        print(f"{q.item()} : {v.item():.6f}")
+        return f"{q.item()} : {v.item():.6f}"
 
 
 
