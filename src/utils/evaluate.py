@@ -68,7 +68,8 @@ def get_baseline(data_loader, device):
 
     mse = torch.mean(se_tensor)
     mae = torch.mean(ae_tensor)
-
+    print(f"MSE has type {type(mse)}\n")
+    print(f"MAE has type {type(mae)}\n")
     return {
         "mse" : mse, #baseline mse
         "mae" : mae, #baseline mae
@@ -95,12 +96,34 @@ def quick_test_sanity(tmse, tmae, ae_tensor, se_tensor):
     print("\n***Squared Error Quantiles***")
     for q, v in zip(quantiles, se_q):
         print(f"{q.item():>5.2f} : {v.item():.6f}")
-
-    # ONLY QUARTILES:
+def show_quartiles(ae_tensor, se_tensor):
+    # computes quartiles and returns them + shows them
     quartiles = torch.tensor([0.25, 0.5, 0.75])
     print(torch.quantile(ae_tensor.flatten(), quartiles))
     for v in quartiles:
         print(f"{v.item():.6f}")
-    print("MSE: ", mse)
-    print("RMSE: ", torch.sqrt(tmse).item())
-    print("MAE", mae, end='\n')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
