@@ -17,9 +17,9 @@ def find_result_file(pattern_str):
 def show_quartiles(err_tensor):
     # computes quartiles and returns them + shows them
     quartiles = torch.tensor([0.25, 0.5, 0.75])
-    print(torch.quantile(err_tensor.flatten(), quartiles))
-    for v in quartiles:
-        print(f"{v.item():.6f}")
+    values = torch.quantile(err_tensor.flatten(), quartiles)
+    for q, v in zip(quartiles, values):
+        print(f"{q.item()} : {v.item():.6f}")
 
 
 
