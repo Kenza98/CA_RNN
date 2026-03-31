@@ -9,6 +9,12 @@ DATA_DIR = PROJECT_ROOT / "data"
 MODEL_DIR = PROJECT_ROOT / "models"
 from src.models.gru import GRU
 
+#helper function to print NaN percentage
+def nan_ratio(tensor, name="tensor"):
+    total = tensor.numel()
+    nans = torch.isnan(tensor).sum().item()
+    print(f"{name}: {nans}/{total} NaN ({100 * nans / total:.1f}%)")
+
 #load the data
 data_file = DATA_DIR / "ca_data.pt"
 sst_tensor = torch.load(data_file)["full_data"]
@@ -25,14 +31,14 @@ def find_result_file(pattern_str):
 
 model_file =find_result_file(r".*gru.*\.pt$") # GRU file
 mtime = model_file.stat().st_mtime
-print(f"Model: {model_file.name}")
-print(f"Created: {datetime.datetime.fromtimestamp(mtime)}")
+
+#print(f"Model: {model_file.name}")
+#print(f"Created: {datetime.datetime.fromtimestamp(mtime)}")
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model_dict = torch.load(model_file, map_location=device)
 
 print(f"Running the model on {device}\n")
-print(model_dict.keys())
 
 #load model
 
@@ -41,38 +47,68 @@ output_dim = 1
 input_dim = 9
 hidden_dim = 56
 
-model = GRU(input_dim=9, hidden_dim=56, output_dim=1, num_layers=4)
+model = GRU(input_dim=9, hidden_dim=56, output_dim=1)
 
 model.load_state_dict(model_dict["GRUStateDict"])
 model_class = model.__class__.__name__
 model.eval()
 
-def ground_truth_frames(sst_tensor, start=4, end=15):
-    #get the truth pixel
-    max_days = sst_tensor.shape[0]
-    for t in range(start, end):
+N = sst_tensor.shape[0]
+def ground_truth_frames(sst_tensor, sequence_length=4):
+    """
+    This function yields the next grid at time t
+    Useful for computing errors
+    """
+    num_steps = N - sequence_length
+    for t in range(sequence_length, num_steps):
         yield sst_tensor[t]  #whole grid for time t (24, 97)
 
-
-def predictions(sst_tensor, model, seq_length=4, num_steps=14):
-    #num_steps = sst_tensor.shape[0]
-    window = sst_tensor[:seq_length]  # (4, 24, 97)
-    for t in range(seq_length, ):
-        neigh = window.unfold(1, 3, 1).unfold(2, 3, 1)                    # (4, 22, 95, 3, 3)
-        X = neigh.contiguous().view(seq_length, -1, 9).permute(1, 0, 2)   # (2090, 4, 9)
-
-        valid_mask = ~torch.isnan(X).any(dim=-1).any(dim=-1)               # (2090,)
+seq_length=4
+steps = N - seq_length
+def predictions(sst_tensor, model , num_steps=steps):
+    window = sst_tensor[:seq_length] # ---seed
+    for t in range(seq_length, seq_length + num_steps):
+        #first : get the 3*3 neighborhood with unfold :
+        neigh_lat = window.unfold(1,3,1)# unfold along dim 1=lats (4,64, 88, 3)
+        neigh_lat_lon = neigh_lat.unfold(2,3,1)  # unfold along dim 2=lons(4, 64, 88, 3, 3)
         
-        next_full = sst_tensor[t].clone()                                  # (24, 97) ground truth
+        # next : materialise this view into a freshly allocated, sequentially ordered block of memory :
+        neigh = neigh_lat_lon.contiguous()
+
+        #now let's get the correct view :
+        X = neigh.view(seq_length, -1, 9)
+        #last : permute to have batch_first for model :
+        X = X.permute(1, 0, 2)   # (5632, 4, 9)
+        #print(X.shape)
+        valid_mask = ~torch.isnan(X).any(dim=-1).any(dim=-1)               # (5632,)
         
+        next_full = sst_tensor[t].clone()                                  # (64, 88) ground truth
+                
         if valid_mask.any():
             pred_flat = model(X[valid_mask])                               # (N_valid, 1)
-            next_full[1:-1, 1:-1][valid_mask] = pred_flat.squeeze(1)      # overwrite valid pixels
+            next_full[1:-1, 1:-1].contiguous().view(-1)[valid_mask] = pred_flat.squeeze(1)
         
+        interior = next_full[1:-1, 1:-1].contiguous().view(-1)  # (5632,)
+        total_interior = interior.numel()
+        n_nan = torch.isnan(interior).sum().item()
+        n_model = valid_mask.sum().item()
+        n_gt = total_interior - n_nan - n_model
+
+        #print(f"t={t} | model: {100*n_model/total_interior:.1f}% | ground truth: {100*n_gt/total_interior:.1f}% | NaN: {100*n_nan/total_interior:.1f}%")
+
+        #nan_ratio(next_full, "CA prediction") # (46.8%)
         yield next_full
         window = torch.cat([window[1:], next_full.unsqueeze(0)])        
 
 
+errors = []
 
 for pred, true in zip(predictions(sst_tensor, model), ground_truth_frames(sst_tensor)):
-    error = torch.abs(pred - true)
+    interior_pred = pred[1:-1, 1:-1].contiguous().view(-1)
+    interior_true = true[1:-1, 1:-1].contiguous().view(-1)
+    valid = ~torch.isnan(interior_pred) & ~torch.isnan(interior_true)
+    mae = torch.abs(interior_pred[valid] - interior_true[valid]).mean().item()
+    errors.append(mae)
+
+for i, e in enumerate(errors):
+    print(f"day {i+1}: MAE = {e:.10f}°C")

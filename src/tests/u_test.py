@@ -18,8 +18,10 @@ def show_quartiles(err_tensor):
     # computes quartiles and returns them + shows them
     quartiles = torch.tensor([0.25, 0.5, 0.75])
     values = torch.quantile(err_tensor.flatten(), quartiles)
+    string = ""
     for q, v in zip(quartiles, values):
-        return f"{q.item()} : {v.item():.6f}"
+        string += f"{q.item()} : {v.item():.6f}\n"
+    return string
 
 
 
