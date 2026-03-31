@@ -9,6 +9,13 @@ DATA_DIR = PROJECT_ROOT / "data"
 MODEL_DIR = PROJECT_ROOT / "models"
 from src.models.gru import GRU
 
+#load the data
+data_file = DATA_DIR / "ca_data.pt"
+sst_tensor = torch.load(data_file)["full_data"]
+
+#print(sst_tensor.shape)
+#exit(0)
+
 def find_result_file(pattern_str):
     pattern = re.compile(pattern_str)
     files = [f for f in MODEL_DIR.iterdir() if pattern.match(f.name)]
@@ -25,6 +32,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model_dict = torch.load(model_file, map_location=device)
 
 print(f"Running the model on {device}\n")
+print(model_dict.keys())
 
 #load model
 
@@ -38,26 +46,31 @@ model = GRU(input_dim=9, hidden_dim=56, output_dim=1, num_layers=4)
 model.load_state_dict(model_dict["GRUStateDict"])
 model_class = model.__class__.__name__
 model.eval()
-#load the data
-data_file = DATA_DIR / "ca_data.pt"
-sst_tensor = torch.load(data_file)["full_data"]
 
-print(sst_tensor.shape)
+def ground_truth_frames(sst_tensor, start=4, end=15):
+    #get the truth pixel
+    max_days = sst_tensor.shape[0]
+    for t in range(start, end):
+        yield sst_tensor[t]  #whole grid for time t (24, 97)
 
-exit(0)
 
-def ground_truth_frames(sst_tensor, start=4):
-    for t in range(start, sst_tensor.shape[0]):
-        #generate neighborhood
-        # return the whole sequence
-        yield sst_tensor[t]  # (24, 97)
+def predictions(sst_tensor, model, seq_length=4, num_steps=14):
+    #num_steps = sst_tensor.shape[0]
+    window = sst_tensor[:seq_length]  # (4, 24, 97)
+    for t in range(seq_length, ):
+        neigh = window.unfold(1, 3, 1).unfold(2, 3, 1)                    # (4, 22, 95, 3, 3)
+        X = neigh.contiguous().view(seq_length, -1, 9).permute(1, 0, 2)   # (2090, 4, 9)
 
-def predictions(sst_tensor, model, seq_length=4):
-    window = sst_tensor[:seq_length]  # (4, 24, 97) — initial seed
-    for _ in range(sst_tensor.shape[0] - seq_length):
-        next_step = model(window)  # (24, 97)
-        yield next_step
-        window = torch.cat([window[1:], next_step.unsqueeze(0)])  # slide
+        valid_mask = ~torch.isnan(X).any(dim=-1).any(dim=-1)               # (2090,)
+        
+        next_full = sst_tensor[t].clone()                                  # (24, 97) ground truth
+        
+        if valid_mask.any():
+            pred_flat = model(X[valid_mask])                               # (N_valid, 1)
+            next_full[1:-1, 1:-1][valid_mask] = pred_flat.squeeze(1)      # overwrite valid pixels
+        
+        yield next_full
+        window = torch.cat([window[1:], next_full.unsqueeze(0)])        
 
 
 
