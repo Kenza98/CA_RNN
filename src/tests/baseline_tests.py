@@ -9,8 +9,8 @@ sys.path.append(str(PROJECT_ROOT))
 from src.utils.evaluate import get_baseline, quick_test_sanity
 DATA_DIR = PROJECT_ROOT / "data"
 MODEL_DIR = PROJECT_ROOT / "models"
-OUT_DIR = PROJECT_ROOT / "outputs"
-
+OUT_DIR = PROJECT_ROOT / "outputs" / "shuffle_True_ep100"
+OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # check if cuda devise available
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -25,28 +25,22 @@ baseline_fp = OUT_DIR / "baselines.pt" #baseline pt file path
 data_file = DATA_DIR / "sst_test_set.pt"
 
 # load data on cpu
-test_data = torch.load(data_file, map_location="cpu")
+test_data = torch.load(data_file, map_location="cpu", weights_only=False)
 X = test_data["X"]
 Y = test_data["Y"]
 total_samples = Y.shape[0]
 print(f"Total samples: {total_samples}\n")
 test_dataset = TensorDataset(X, Y)
+
+#keep data unshuffled (useless)
 data_loader = DataLoader(test_dataset, batch_size=256, shuffle=False)
 
 # === SAVING RESULTS TO PT FILE ===
+start = datetime.now()
 my_dict = get_baseline(data_loader, device)
+print(f"Baseline computed in {datetime.now() - start}")
 
-
-# ***PRINT SOME QUANTILES***
-mse = my_dict["mse"]
-mae= my_dict["mae"]
-ae_tensor = my_dict["absolute_error"]
-se_tensor = my_dict["squared_error"]
 quick_test_sanity(mse, mae, ae_tensor, se_tensor)
-
-
-for k, v in my_dict.items():
-    print(f"{k}: {type(v)}, {v.shape if hasattr(v, 'shape') else v}")
 
 torch.save(my_dict, baseline_fp)
 print("Saved baseline evaluation.", end="\n")
