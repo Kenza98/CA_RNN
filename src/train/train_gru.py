@@ -32,7 +32,7 @@ print(f"Using device: {device}", flush=True)
 
 #create name for pt file
 job_id = os.environ.get("SLURM_JOB_ID") #for gpu name
-timestamp = datetime.now().strftime("%Y%m%d_%H%M%S") #for cpu name
+timestamp = datetime.now().strftime("%m%d_%H%M") #for cpu name
 
 if device.type == "cpu":
     run_id = f"cpu_{timestamp}"
@@ -42,10 +42,10 @@ else:
 
 # Load data
 load_file = DATA_DIR / "sst_train_set.pt"
-data = torch.load(load_file, map_location="cpu")
+data = torch.load(load_file, map_location="cpu", weights_only=False)
 X, Y = data["X"], data["Y"]
 N = X.shape[0]  # nb of samples
-
+print("Size of sample : ", N)
 train_dataset = TensorDataset(X, Y)
 train_loader = DataLoader(train_dataset, batch_size=256, shuffle=True, num_workers=4)
 
@@ -56,12 +56,12 @@ output_dim = 1
 
 # Hyperparameters
 learning_rate = 1e-4
-num_epochs = 100
-hidden_dim = 7 * 8
-
+num_epochs = 30
+hidden_dim = 56
+k = 4
 # GRU model
-model = GRU(input_dim, hidden_dim, output_dim, num_layers=1)
-model_class = model.__class__.__name__  # move this up here
+model = GRU(input_dim, hidden_dim, output_dim, num_layers=k)
+model_class = model.__class__.__name__
 print(f"Model Class name is : {model_class}\n")
 
 if device.type == "cpu":

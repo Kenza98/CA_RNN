@@ -12,6 +12,13 @@ test_data_file = DATA_DIR / "sst_test_set.pt"
 data = torch.load(test_data_file)
 X, Y = data["X"], data["Y"]
 N = Y.shape[0]
+
+print(torch.isnan(Y).sum())
+print(torch.isnan(X).sum())
+
+
+exit(0)
+
 print(N)
 I = [randint(0, N-1) for i in range(5)]
 
@@ -22,8 +29,6 @@ print(X[I])
 
 
 
-exit(0)
-print(torch.isnan(Y).sum())
 
 for k, v in data.items():
     print(k)

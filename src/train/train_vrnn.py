@@ -36,7 +36,7 @@ else:
 
 # create the train data loader
 load_file = DATA_DIR / "sst_train_set.pt" #data file
-data = torch.load(load_file, map_location="cpu")
+data = torch.load(load_file, map_location="cpu", weights_only=False)
 X = data["X"]  # moore neighborhood enriched TS already in sequence format
 Y = data["Y"]
 train_dataset = TensorDataset(X, Y)
@@ -49,22 +49,19 @@ output_dim = 1
 
 #HYP PARAMETERS
 learning_rate = 1e-4
-num_epochs = 100
-batch_size = 32
-seq_length = 8
-hidden_dim = 7 * 8
-
+num_epochs = 30
+batch_size = 256
+#seq_length = 4
+hidden_dim = 56
+k=4
 
 #MODEL
-model = VanillaRNN(input_dim, hidden_dim, output_dim)
-model_class = model.__class__.__name__  # move this up here
+model = VanillaRNN(input_dim, hidden_dim, output_dim, num_layers=k)
+model_class = model.__class__.__name__
 print(f"Model Class name is : {model_class}\n")
-if device.type == "cpu":
-    run_is = f"cpu_{timestamp}"
-else:
-    run_id = f"gpu_{job_id}"
 
 model_file = MODEL_DIR / f"{model_class.lower()}_{run_id}.pt"
+print(model_file)
 criterion = nn.MSELoss()
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
@@ -82,14 +79,14 @@ checkpoint = {}
 checkpoint[f"{model_class}StateDict"] = model.state_dict()
 checkpoint["model_type"] = model_class
 
-# Save everything back to the same .pt file
+# Save everything back to the model .pt file
 torch.save(checkpoint, model_file)
 print(f"{model_class} model successfully saved to {model_file}")
 
 
 # Plots
-save_path = OUT_DIR / f"{model_class.lower()}_{run_id}_train_loss.png"
+save_path = OUT_DIR / f"{model_class}_{run_id}_train_loss.png"
 plot_loss_per_epoch(train_loss, save_path)
 
-fp = OUT_DIR / f"{model_class.lower()}_{run_id}_grad.png"
+fp = OUT_DIR / f"{model_class}_{run_id}_grad.png"
 plot_grad_hist(grad_history, fp)

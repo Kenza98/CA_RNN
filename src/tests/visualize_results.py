@@ -10,7 +10,7 @@ print(PROJECT_ROOT)
 
 DATA_DIR = PROJECT_ROOT / "data"
 MODEL_DIR = PROJECT_ROOT / "models"
-OUT_DIR = PROJECT_ROOT / "outputs"
+OUT_DIR = PROJECT_ROOT / "outputs/shuffle_True_ep100"
 
 
 def preds_vs_targets(Y, Y_model):
@@ -148,7 +148,10 @@ def plot_mse_boxplot(model_sample_error, baseline_sample_error, fp):
     fig.savefig(fp, dpi=150, bbox_inches="tight")
     plt.close(fig)
 
-def mse_boxplot_all(model1_mse, model2_mse, model3_mse, model4_mse, fp):
+def boxplot_all(model1_mse, model2_mse, model3_mse, model4_mse, fp, error="Squared Error"):
+    """
+    give the models in order: baseline, vrnn, lstm, gru
+    """
     fig,axes = plt.subplots()
     axes.boxplot([
         model1_mse,
@@ -160,7 +163,7 @@ def mse_boxplot_all(model1_mse, model2_mse, model3_mse, model4_mse, fp):
     showfliers=False,
     )
     axes.set_title("Models")
-    axes.set_ylabel("Squared Error")
+    axes.set_ylabel(error)
     axes.grid(True, axis="y", linestyle="--", alpha=.5)
     #fig.suptitle("Error Distribution: Baseline vs Model")
     fig.savefig(fp, dpi=150, bbox_inches="tight")
@@ -229,7 +232,14 @@ def main():
     m3 = dict3["squared_error"]
     baseline = dict_baseline["squared_error"]
 
-    mse_boxplot_all(m1, m2, m3, baseline, OUT_DIR / "boxplot_all")
+    boxplot_all(baseline, m1, m2, m3, OUT_DIR / "boxplot_se")
+
+    ae1 = dict1["absolute_error"]
+    ae2 = dict2["absolute_error"]
+    ae3 = dict3["absolute_error"]
+    ae_baseline = dict_baseline["absolute_error"]
+    
+    boxplot_all(ae_baseline, ae1, ae2, ae3, OUT_DIR / "boxplot_ae", error="Absolute Error")
 
 
 if __name__ == "__main__":

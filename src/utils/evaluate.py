@@ -1,4 +1,5 @@
 import torch
+import math
 
 def evaluate_model(model, test_loader, device):
     """
@@ -81,11 +82,14 @@ def get_baseline(data_loader, device):
 def quick_test_sanity(tmse, tmae, ae_tensor, se_tensor):
     if isinstance(tmse, torch.Tensor):
         mse = tmse.item()
+        print(f"MSE BASELINE : {mse}\n")
+        rmse = math.sqrt(mse)
+        print(f"RMSE BASELINE : {rmse}")
     if isinstance(tmae, torch.Tensor):
         mae = tmae.item()
-    # === SHOWING QUANTILES ===
+        print(f"MAE BASELINE : {mae}\n")
+# === SHOWING QUANTILES ===
     quantiles = torch.tensor([0.0, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99, 1.0])
-    
     ae_q = torch.quantile(ae_tensor, quantiles)
     se_q = torch.quantile(se_tensor, quantiles)
 

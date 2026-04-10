@@ -37,6 +37,7 @@ if args.model_file is None:
 else:
     model_file = PROJECT_ROOT / args.model_file
 
+print(model_file)
 
 # check if cuda devise available
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -48,7 +49,7 @@ if device.type == "cuda":
 # LOAD DATA FILE, GET BASELINE
 
 test_data_file = DATA_DIR / "sst_test_set.pt"
-test_data = torch.load(test_data_file, map_location="cpu")
+test_data = torch.load(test_data_file, map_location="cpu", weights_only=False)
 X = test_data["X"]
 Y = test_data["Y"]
 total_samples = Y.shape[0]
@@ -64,12 +65,13 @@ print("Last model update date: ", datetime.fromtimestamp(timestamp))
 # load the model checkpoint on disk (cpu)
 output_dim = 1
 input_dim = 9
-hidden_dim = 7 * 8
+hidden_dim =56
+k=4
 checkpoint = torch.load(model_file, map_location=device)
 
 print("Top-level keys in model file:", checkpoint.keys(), flush=True)
 
-model = LSTM(input_dim, hidden_dim, output_dim)
+model = LSTM(input_dim, hidden_dim, output_dim, k)
 model.load_state_dict(checkpoint["LSTMStateDict"])
 
 # GETTING RESULTS WITH HELPER FCT

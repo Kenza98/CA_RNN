@@ -13,7 +13,7 @@ from src.utils.evaluate import evaluate_model, quick_test_sanity
 #continue defining more paths...
 DATA_DIR = PROJECT_ROOT / "data"
 MODEL_DIR = PROJECT_ROOT / "models"
-OUT_DIR = PROJECT_ROOT / "outputs" / "shuffle_True_ep100"
+OUT_DIR = PROJECT_ROOT / "outputs" / "k_four"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 #get the model file
@@ -35,6 +35,7 @@ if args.model_file is None:
 else:
     model_file = PROJECT_ROOT / args.model_file
 
+print(model_file)
 
 
 # check if file was ran with --use-gpu + if cuda devise available
@@ -46,7 +47,7 @@ if device.type == "cuda":
 
 # LOAD DATA CREATE LOADER
 test_data_file = DATA_DIR / "sst_test_set.pt"
-data = torch.load(test_data_file, map_location="cpu")
+data = torch.load(test_data_file, map_location="cpu", weights_only=False)
 X, Y = data["X"], data["Y"]
 test_dataset = TensorDataset(X, Y)
 test_loader = DataLoader(test_dataset, batch_size=256, shuffle=False)
@@ -55,9 +56,10 @@ test_loader = DataLoader(test_dataset, batch_size=256, shuffle=False)
 # load the model checkpoint on disk (cpu)
 output_dim = 1
 input_dim = 9
-hidden_dim = 7 * 8
+hidden_dim =56
+k=4
 checkpoint = torch.load(model_file, map_location=device)
-model = GRU(input_dim, hidden_dim, output_dim)
+model = GRU(input_dim, hidden_dim, output_dim, k)
 
 model.load_state_dict(checkpoint["GRUStateDict"])
 model_class = model.__class__.__name__

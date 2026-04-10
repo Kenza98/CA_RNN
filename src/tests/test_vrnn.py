@@ -15,7 +15,7 @@ from src.utils.evaluate import evaluate_model, quick_test_sanity
 #continue defining more paths...
 DATA_DIR = PROJECT_ROOT / "data"
 MODEL_DIR = PROJECT_ROOT / "models"
-OUT_DIR = PROJECT_ROOT / "outputs" / "shuffle_True_ep100"
+OUT_DIR = PROJECT_ROOT / "outputs" / "k_four"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -27,7 +27,7 @@ args = parser.parse_args()
 
 if args.model_file is None:
     # fall back to most recent vrnn_gpu*.pt
-    pattern = re.compile(r"^vrnn_gpu.*\.pt$")
+    pattern = re.compile(r"^vanillarnn_gpu.*\.pt$")
     pt_files = sorted(
         [f for f in MODEL_DIR.iterdir() if pattern.match(f.name)],
         key=lambda f: f.stat().st_mtime
@@ -38,10 +38,12 @@ if args.model_file is None:
 else:
     model_file = PROJECT_ROOT / args.model_file
 
+print(model_file)
 
 # check if cuda devise available
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}", flush=True)
+print(f"Using model: {model_file}")
 if device.type == "cuda":
     print(f"GPU name: {torch.cuda.get_device_name(0)}", flush=True)
     print(f"CUDA version: {torch.version.cuda}", flush=True)
@@ -49,7 +51,7 @@ if device.type == "cuda":
 
 # LOAD DATA CREATE LOADER
 test_data_file = DATA_DIR / "sst_test_set.pt"
-data = torch.load(test_data_file, map_location=device)
+data = torch.load(test_data_file, map_location=device, weights_only=False)
 X = data["X"]
 Y = data["Y"]
 total_samples = X.shape[0]
@@ -71,9 +73,10 @@ print("Last model update date: ", datetime.fromtimestamp(timestamp))
 
 output_dim = 1
 input_dim = 9
-hidden_dim = 7 * 8
+hidden_dim =56
+k=4
 
-model = VanillaRNN(input_dim, hidden_dim, output_dim)
+model = VanillaRNN(input_dim, hidden_dim, output_dim, k)
 model.load_state_dict(model_loader["VanillaRNNStateDict"])
 
 # GET RESULTS WITH HELPER FCT
