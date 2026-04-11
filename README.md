@@ -27,6 +27,11 @@ CA_RNN_repo/
 - Python **3.11**
 - Poetry (recommended) or pip
 - The package dependencies are defined in `pyproject.toml` and `poetry.lock`.
+---
+## Licence
+
+This source code is made available under the licence CC BY-NC-SA 4.0. Please read licence.txt.
+
 
 ---
 
@@ -87,10 +92,6 @@ Once installed, the package can be used in the following way:
 ### Note to reader:
 If you have any suggestions of new metrics to use for training / testing or visualizations you wish to be developped, please open an issue and it will be adressed.
 
----
-### Licence:
-
-This source code is made available under the licence CC BY-NC-SA 4.0. Please read licence.txt.
 
 
 
