@@ -16,7 +16,7 @@ CA_RNN_repo/
 ├── models/               # Neural network definitions
 ├── tests/                # Evaluation and plotting scripts
 ├── pyproject.toml        # Poetry configuration and dependencies
-├── licence.txt
+├── licence.txt           # Licence specifications
 ├── poetry.lock           # Locked dependency versions
 └── README.md             # This file
 
