@@ -84,11 +84,13 @@ Once installed, the package can be used in the following way:
 4. Some visualizations are available in the **.png** files.
 ---
 
-### Note to reader :
+### Note to reader:
 If you have any suggestions of new metrics to use for training / testing or visualizations you wish to be developped, please open an issue and it will be adressed.
 
+---
+### Licence:
 
-
+This source code is made available under the licence CC BY-NC-SA 4.0. Please read licence.txt.
 
 
 
