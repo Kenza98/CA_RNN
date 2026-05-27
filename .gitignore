@@ -9,6 +9,7 @@ __pycache__/
 *.h5
 *.npz
 *.nc
+*.pt
 
 # Logs
 *.log

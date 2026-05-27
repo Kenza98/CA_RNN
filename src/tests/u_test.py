@@ -53,8 +53,6 @@ for l, e in zip(labels, Err):
     print(f"Error quartiles for {l} : {show_quartiles(e)}\n")
     
 
-exit(0)
-
 baseline_err, vanilla_err, lstm_err, gru_err = [e.numpy() for e in Err] #this modifies the original variables
 
 
