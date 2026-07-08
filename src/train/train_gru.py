@@ -18,7 +18,7 @@ OUT_DIR = PROJECT_ROOT / "outputs"
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--use-gpu", action="store_true", help="Use GPU if CUDA module available")
-parser.add_argument("--n-trials", type=int, default=20, help="Number of Optuna trials")
+parser.add_argument("--n-trials", type=int, default=100, help="Number of Optuna trials")
 args = parser.parse_args()
 
 device = torch.device("cuda" if (args.use_gpu and torch.cuda.is_available()) else "cpu")
@@ -44,7 +44,7 @@ def objective(trial):
     hidden_dim = trial.suggest_categorical("hidden_dim", [32, 56, 128, 256])
     num_layers = trial.suggest_int("num_layers", 1, 5)
     batch_size = trial.suggest_categorical("batch_size", [128, 256, 512])
-    num_epochs = 20
+    num_epochs = trial.suggest_categorical("num_epochs", [3, 5, 10,20, 30])
 
     train_loader = DataLoader(TensorDataset(X, Y), batch_size=batch_size, shuffle=True, num_workers=4)
     val_loader = DataLoader(TensorDataset(X_val, Y_val), batch_size=batch_size, shuffle=False, num_workers=4)
@@ -65,7 +65,8 @@ def objective(trial):
             val_losses.append(loss.item())
 
     val_mse = sum(val_losses) / len(val_losses)
-    print(f"Trial {trial.number} | hidden={hidden_dim} layers={num_layers} lr={lr:.2e} bs={batch_size} -> val_MSE={val_mse:.6f}", flush=True)
+    print(f"Trial {trial.number} | hidden={hidden_dim} | Layers={num_layers} | lr={lr:.2e}", flush=True)
+    print(f"bs={batch_size}\n----> val_MSE={val_mse:.6f}", flush=True)
     return val_mse
 
 
