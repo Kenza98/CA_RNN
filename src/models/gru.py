@@ -10,10 +10,12 @@ class GRU(nn.Module):
             num_layers=num_layers,
             batch_first=True
         )
+	#self.ln = nn.LayerNorm(hidden_dim)
         self.fc = nn.Linear(hidden_dim, output_dim)
 
     def forward(self, x):
         out, _ = self.gru(x)      # out: (batch, seq, hidden)
         out = out[:, -1, :]       # last time step
+        #out = self.ln(out)  # stabilize before final layer
         out = self.fc(out)        # (batch, output_dim)
         return out

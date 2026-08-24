@@ -14,6 +14,7 @@ parser.add_argument(
     action="store_true",
     help="Use GPU if available",
 )
+
 args = parser.parse_args()
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -23,9 +24,9 @@ OUT_DIR.mkdir(parents=True, exist_ok=True)
 SLURM_JOB_ID = os.environ.get("SLURM_JOB_ID", "local")
 
 SPLITS = {
-    "train": (date(2015, 1, 1), date(2020, 12, 31)),
+    "train": (date(2022, 1, 1), date(2024, 12, 31)),
     "val":   (date(2021, 1, 1), date(2022, 12, 31)),
-    "test":  (date(2023, 1, 1), date(2026, 2, 28)),
+    "test":  (date(2025, 1, 1), date(2026, 2, 28)),
 }
 
 def load_dataset(start: date, end: date, chunk_size=200):
@@ -104,7 +105,7 @@ def main():
         X, Y = build_learning_set(ds, seq_length=6, chunk_size=200, use_gpu=args.use_gpu)
         print(f"X shape: {X.shape}, Y shape: {Y.shape}", flush=True)
 
-        filename = f"sst_{split_name}_set_fixed_{SLURM_JOB_ID}.pt"
+        filename = f"sst_{split_name}_set_acri_{SLURM_JOB_ID}.pt"
         output_filepath = OUT_DIR / filename
         torch.save(
             {"X": X, "Y": Y, "start_time": sd, "end_time": ed},
