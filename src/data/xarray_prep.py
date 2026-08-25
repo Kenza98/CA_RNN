@@ -1,3 +1,12 @@
+"""ARCHIVED -- superseded by src/data/prep.py + src/data/extractors.py.
+
+Kept for reference only; do not run. The feature extraction that was inlined
+here is now selected via the --features {nn,nca} argument on prep.py:
+    nn   point-wise (cell's own history)
+    nca  3x3 Moore neighborhood
+"""
+
+
 import argparse
 import gc
 import os
@@ -13,6 +22,7 @@ parser.add_argument(
     "--use-gpu",
     action="store_true",
     help="Use GPU if available",
+    #extractor = EXTRACTORS[args.features],
 )
 
 args = parser.parse_args()
@@ -23,10 +33,11 @@ OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 SLURM_JOB_ID = os.environ.get("SLURM_JOB_ID", "local")
 
+#each split has a name mapped to a tuple of start date , end date
 SPLITS = {
-    "train": (date(2022, 1, 1), date(2024, 12, 31)),
-    "val":   (date(2021, 1, 1), date(2022, 12, 31)),
-    "test":  (date(2025, 1, 1), date(2026, 2, 28)),
+    "train": (date(2021, 1, 1), date(2023, 12, 31)),
+    "val":   (date(2024, 1, 1), date(2024, 12, 31)),
+    "test":  (date(2025, 1, 1), date(2026, 7, 31)),
 }
 
 def load_dataset(start: date, end: date, chunk_size=200):
@@ -69,6 +80,7 @@ def build_learning_set(ds, seq_length=4, chunk_size=200, use_gpu=False):
         block = torch.from_numpy(block_np).float()
 
         for t in range(block.shape[0] - seq_length):
+            #X_t, Y_t = extractor(block[t : t + seq_length], block[t + seq_length])
             seq_block = block[t : t + seq_length]
             target_map = block[t + seq_length]
 
@@ -95,13 +107,18 @@ def build_learning_set(ds, seq_length=4, chunk_size=200, use_gpu=False):
 
     X_tensor = torch.cat(X_chunks).to(device)
     Y_tensor = torch.cat(Y_chunks).to(device)
+
+    assert X_tensor.shape[0] == Y_tensor.shape[0]  #verify cropping logic worked.
+
     return X_tensor, Y_tensor
 
 
 def main():
+
     for split_name, (sd, ed) in SPLITS.items():
-        print(f"\n=== Generating {split_name} set: {sd} -> {ed} ===", flush=True)
+        print(f"Generating {split_name} set: {sd} -> {ed}\n", flush=True)
         ds = load_dataset(sd, ed, chunk_size=200)
+        
         X, Y = build_learning_set(ds, seq_length=6, chunk_size=200, use_gpu=args.use_gpu)
         print(f"X shape: {X.shape}, Y shape: {Y.shape}", flush=True)
 
