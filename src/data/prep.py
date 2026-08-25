@@ -149,7 +149,6 @@ def main():
 
         ds.close()
         del X, Y
-        gc.collect()
 
 
 if __name__ == "__main__":
