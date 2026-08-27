@@ -1,0 +1,14 @@
+name: carnn_venv
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - numpy
+  - pandas
+  - xarray
+  - scipy
+  - netcdf4
+  - tqdm
+  - pip
+  - pip:
+      - copernicusmarine
