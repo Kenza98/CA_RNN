@@ -1,3 +1,9 @@
+"""
+Train a GRU model on the SST dataset using Optuna for hyperparameter optimization
+Difference with fixed_gru: instead of fixed hyperparameters, a search is performed
+over a range of hyperparameters (hidden_dim, num_layers, batch_size, num_epochs)
+"""
+
 import torch
 from torch.utils.data import TensorDataset, DataLoader
 from pathlib import Path
@@ -9,6 +15,7 @@ import os
 from src.utils.train_loop import train_model
 from datetime import datetime
 from src.models.gru import GRU
+#the objective will be to plot gradients more finely, using hooks...
 from src.utils.plots_model import plot_grad_hist, plot_loss_per_epoch
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -32,6 +39,7 @@ run_id = f"gpu_{job_id}" if device.type == "cuda" else f"cpu_{timestamp}"
 data = torch.load(DATA_DIR / "sst_train_set_norm.pt", map_location="cpu", weights_only=False)
 X, Y = data["X"], data["Y"]
 
+#validation set
 val_data = torch.load(DATA_DIR / "sst_val_set_norm.pt", map_location="cpu", weights_only=False)
 X_val, Y_val = val_data["X"], val_data["Y"]
 
@@ -41,9 +49,9 @@ lr = 1e-4
 
 
 def objective(trial):
-    hidden_dim = trial.suggest_categorical("hidden_dim", [32, 56, 128, 256])
-    num_layers = trial.suggest_int("num_layers", 1, 5)
-    batch_size = trial.suggest_categorical("batch_size", [128, 256, 512])
+    hidden_dim = trial.suggest_categorical("hidden_dim", [32, 56, 128, 256]) #number of neurons in one hidden layer (how wide)
+    num_layers = trial.suggest_int("num_layers", 1, 5) #number of hidden layers in the GRU (how deep)
+    batch_size = trial.suggest_categorical("batch_size", [128, 256, 512])  
     num_epochs = trial.suggest_categorical("num_epochs", [3, 5, 10,20, 30])
 
     train_loader = DataLoader(TensorDataset(X, Y), batch_size=batch_size, shuffle=True, num_workers=4)
@@ -53,6 +61,7 @@ def objective(trial):
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
+    #this function needs to be modified to enable plotting gradients with hooks
     train_model(model, train_loader, optimizer, criterion, num_epochs, device)
 
     model.eval()
