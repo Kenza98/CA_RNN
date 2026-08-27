@@ -17,7 +17,7 @@ import torch
 import xarray as xr
 from tqdm import tqdm
 
-from .extractors import EXTRACTORS
+from .extractors import *
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 OUT_DIR = PROJECT_ROOT / "data"
@@ -84,13 +84,13 @@ def build_learning_set(ds, extractor, seq_length=6, chunk_size=200, use_gpu=Fals
         block = torch.from_numpy(block_np).float()
 
         for t in range(block.shape[0] - seq_length):
-            #first arg : current block ; second arg: target map
-            X_t, Y_t = extractor(block[t : t + seq_length], block[t + seq_length])
+            seq_block= block[t : t + seq_length]
+            target_map= block[t + seq_length]
 
-            #extractor extracts all inside cells with no discrimination -- nan's arrise.
-            nan_in_features = torch.isnan(X_t).any(dim=-1).any(dim=-1)
-            nan_in_target = torch.isnan(Y_t).squeeze(-1)
-            valid_mask = ~(nan_in_features | nan_in_target)
+            X_t, Y_t = extractor(seq_block, target_map)
+
+            # same criterion for both arms: full 3x3 neighborhood must be finite
+            valid_mask = neighborhood_valid_mask(seq_block, target_map)
 
             X_t = X_t[valid_mask]
             Y_t = Y_t[valid_mask]

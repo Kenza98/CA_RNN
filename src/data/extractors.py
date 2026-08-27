@@ -1,3 +1,5 @@
+import torch
+
 """Feature extraction logic, isolated from the shared prep pipeline.
 
 Each extractor maps (seq_block, target_map) -> (X_t, Y_t):
@@ -44,3 +46,35 @@ EXTRACTORS = {
     "nn": extract_pointwise,
     "nca": extract_neighborhood,
 }
+
+def neighborhood_valid_mask(seq_block, target_map):
+    """Return the cells kept by both extractors, so experiments are comparable.
+
+    A cell is valid if and only if its full 3x3 moore neighborhood is not nan at
+    every timestep and its target is not nan. This is the ``nca`` criterion
+    applied to ``nn`` as well.
+
+    The mask is computed from the grid, never from ``X_t``. Masking on ``X_t``
+    makes the criterion depend on the feature count (9 for ``nca``, 1 for
+    ``nn``), which drops the coastline ring from ``nca`` alone.
+
+    Parameters
+    ----------
+    seq_block : torch.Tensor
+        Shape ``(seq_length, H, W)``. The input window.
+    target_map : torch.Tensor
+        Shape ``(H, W)``. The step to predict.
+
+    Returns
+    -------
+    torch.Tensor
+        Boolean mask of shape ``(n_cells,)`` with ``n_cells = (H-2)*(W-2)``,
+        in row-major order matching both extractors.
+    """
+    
+    seq_length = seq_block.shape[0]
+    neigh = seq_block.unfold(1, 3, 1).unfold(2, 3, 1)
+    neigh = neigh.contiguous().view(seq_length, -1, 9).permute(1, 0, 2)
+    nan_in_neigh = torch.isnan(neigh).any(dim=-1).any(dim=-1)
+    nan_in_target = torch.isnan(target_map[1:-1, 1:-1].reshape(-1))
+    return ~(nan_in_neigh | nan_in_target)
