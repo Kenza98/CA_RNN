@@ -9,83 +9,84 @@ Usage:
 
 import argparse
 import os
-from datetime import date
+
+# from datetime import date
 from pathlib import Path
 
-import copernicusmarine
+# import copernicusmarine
 import torch
 import xarray as xr
 from tqdm import tqdm
 
-from .extractors import *
+from .extractors import neighborhood_valid_mask, EXTRACTORS
+from .download import BBOX, DATASET_ID, SPLITS, raw_path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 OUT_DIR = PROJECT_ROOT / "data"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-DATASET_ID = "cmems_mod_med_phy-temp_my_4.2km_P1D-m"
-BBOX = dict(
-    minimum_longitude=12,
-    maximum_longitude=16,
-    minimum_latitude=44.5,
-    maximum_latitude=45.5,
-)
-
-SPLITS = {
-    "train": (date(2021, 1, 1), date(2023, 12, 31)),
-    "val":   (date(2024, 1, 1), date(2024, 12, 31)),
-    "test":  (date(2025, 1, 1), date(2026, 7, 31)),
-}
 
 def parse_args():
     p = argparse.ArgumentParser()
-    p.add_argument("--experiment", type=int, required=True,
-                   help="Experiment number, used in the output filename")
-    p.add_argument("--features", choices=sorted(EXTRACTORS), required=True,
-                   help="nn = point-wise history, nca = 3x3 neighborhood")
+    p.add_argument(
+        "--experiment",
+        type=int,
+        required=True,
+        help="Experiment number, used in the output filename",
+    )
+    p.add_argument(
+        "--features",
+        choices=sorted(EXTRACTORS),
+        required=True,
+        help="nn = point-wise history, nca = 3x3 neighborhood",
+    )
     p.add_argument("--seq-length", type=int, default=6)
     p.add_argument("--chunk-size", type=int, default=200)
-    p.add_argument("--use-gpu", action="store_true", help="Use GPU if available")
+
     return p.parse_args()
 
-def load_dataset(start: date, end: date, chunk_size=200):
-    ds = copernicusmarine.open_dataset(
-        dataset_id=DATASET_ID,
-        variables=["thetao"],
-        start_datetime=start.isoformat(),
-        end_datetime=end.isoformat(),
-        **BBOX,
-    )
-    return ds.chunk({"time": chunk_size})
 
-
-def build_learning_set(ds, extractor, seq_length=6, chunk_size=200, use_gpu=False):
-    device = torch.device("cuda" if (use_gpu and torch.cuda.is_available()) else "cpu")
-    print(f"Using device: {device}", flush=True)
-
+def load_dataset(split_name, chunk_size=200):
+    """Open the local netCDF for a split, select the surface level."""
+    ds = xr.open_dataset(raw_path(split_name)).chunk({"time": chunk_size})
     sst = ds["thetao"]
     if "depth" in sst.dims:
         sst = sst.isel(depth=0)
-    sst = sst.astype("float32")
+        #print(sst.dtype)
+    return ds, sst 
 
-    stats = xr.Dataset({"mean": sst.mean(skipna=True), "std": sst.std(skipna=True)}).compute()
+def build_learning_set(sst, extractor, seq_length=6, chunk_size=200):
+    # only showing stats of the data
+    # single pass over dask of the data by calling .compute() only once
+    stats = xr.Dataset(
+        {"mean": sst.mean(skipna=True), "std": sst.std(skipna=True)}
+    ).compute()
     global_mean = float(stats["mean"])
     global_std = float(stats["std"])
     print(f"Global mean= {global_mean:.4f}", flush=True)
     print(f"Global std= {global_std:.4f}", flush=True)
 
+    # initialize the objects this fct builds
     X_chunks, Y_chunks = [], []
-    total_time = sst.sizes["time"]
+    total_time = sst.sizes["time"]  # nb of timesteps in dataset
 
-    for start in tqdm(range(0, total_time - seq_length, chunk_size),
-                      desc="Processing chunks"):
+    for start in tqdm(
+        range(0, total_time - seq_length, chunk_size), desc="Processing chunks"
+    ):
+        # chunks overlap by seq_length so each window has its target;
+        # clamp at total_time for the last chunk
         end = min(total_time, start + chunk_size + seq_length)
-        block_np = sst.isel(time=slice(start, end)).compute().values
-        block = torch.from_numpy(block_np).float()
+
+        block_lazy = sst.isel(
+            time=slice(start, end)
+        )  # lazy loads the data array sliced
+        block_xr = block_lazy.compute()  # DataArray wrapping a dask array
+        block_np = block_xr.values  # DataArray wrapping a numpy array
+        block = torch.from_numpy(block_np).float()  # finally, torch from the np
 
         for t in range(block.shape[0] - seq_length):
-            seq_block= block[t : t + seq_length]
-            target_map= block[t + seq_length]
+            seq_block = block[t : t + seq_length]
+            target_map = block[t + seq_length]
 
             X_t, Y_t = extractor(seq_block, target_map)
 
@@ -102,7 +103,7 @@ def build_learning_set(ds, extractor, seq_length=6, chunk_size=200, use_gpu=Fals
             X_chunks.append(X_t)
             Y_chunks.append(Y_t)
 
-        del block, block_np
+        del block_xr, block
 
     return torch.cat(X_chunks), torch.cat(Y_chunks), global_mean, global_std
 
@@ -110,18 +111,14 @@ def build_learning_set(ds, extractor, seq_length=6, chunk_size=200, use_gpu=Fals
 def main():
     args = parse_args()
     extractor = EXTRACTORS[args.features]
-    slurm_job_id = os.environ.get("SLURM_JOB_ID", "local")  # Doc: os.environ.get(key, default)
+    slurm_job_id = os.environ.get(
+        "SLURM_JOB_ID", "local"
+    )  # Doc: os.environ.get(key, default)
 
     for split_name, (sd, ed) in SPLITS.items():
         print(f"\n------ {split_name}: {sd} -> {ed} ------", flush=True)
-        ds = load_dataset(sd, ed, chunk_size=args.chunk_size)
-        X, Y, global_mean, global_std = build_learning_set(
-            ds, 
-            extractor,
-            seq_length=args.seq_length,
-            chunk_size=args.chunk_size,
-            use_gpu=args.use_gpu,
-        )
+        ds, sst = load_dataset(split_name)
+        X, Y, global_mean, global_std = build_learning_set(sst, extractor)
         print(f"X: {tuple(X.shape)}  Y: {tuple(Y.shape)}", flush=True)
 
         out = OUT_DIR / f"{args.experiment}_{args.features}_{split_name}.pt"
@@ -153,37 +150,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

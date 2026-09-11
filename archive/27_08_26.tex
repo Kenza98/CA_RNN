@@ -1,0 +1,205 @@
+\documentclass[11pt]{amsart}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{url}
+
+\title{Ablation study, experiment 1: isolating the CA framing}
+\author{Kenza Benjelloun}
+\date{28 August 2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Position in the chapter}
+
+Experiment 1 is the first ablation of the final chapter. It isolates a single
+factor: whether the cellular automaton framing --- feeding each cell its
+spatial neighborhood --- contributes anything beyond the temporal recurrence a
+plain RNN already provides.
+
+Everything else is held fixed. Both \emph{streams} use the same architecture, the same
+sequence length, the same splits, the same normalisation statistics and the
+same underlying grid. The only difference is the shape of the input tensor:
+
+\begin{itemize}
+  \item \texttt{nn} --- $(N, 6, 1)$: each sample is one cell's own history
+    over six days. Recurrence only.
+  \item \texttt{nca} --- $(N, 6, 9)$: each sample is the same six days, but
+    each timestep carries the cell's $3 \times 3$ Moore neighborhood.
+    Recurrence plus CA-style spatial context.
+\end{itemize}
+
+The ablation is therefore of the second axis of the tensor's last dimension:
+$F = 1$ against $F = 9$. If \texttt{nca} does not beat \texttt{nn}, the CA
+framing is not earning the ninefold increase in input width, and the chapter's
+central claim needs qualifying.
+
+The data for both streams is generated and verified. This document records how,
+and the one problem that had to be fixed first.
+
+\section{Generation}
+
+Produced by \texttt{src/data/prep.py}, which shares all loading, masking,
+splitting and saving logic between the two streams and differs only in the
+extractor it calls. That sharing is deliberate: it is what allows any
+difference in the results to be attributed to the framing rather than to
+preprocessing.
+
+Dataset \texttt{cmems\_mod\_med\_phy-temp\_my\_4.2km\_P1D-m}, version 202511,
+variable \texttt{thetao} (SST, ${}^\circ$C). Bounding box longitude 12--16,
+latitude 44.5--45.5 (Northern Adriatic), surface level only. Sequence length 6.
+
+\begin{table}[h]
+\begin{tabular}{llrr}
+\toprule
+Split & Range & Mean & Std \\
+\midrule
+train & 2021-01-01 $\to$ 2023-12-31 & 17.8304 & 5.8792 \\
+val   & 2024-01-01 $\to$ 2024-12-31 & 18.6804 & 5.8236 \\
+test  & 2025-01-01 $\to$ 2026-07-31 & 17.6932 & 5.9215 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Disjoint and chronologically ordered. The test window ends at the last day of
+product coverage; the final six days yield no target, so the effective test
+window ends around 2026-07-25. The train statistics are to be used for all
+three splits in both streams --- normalising val or test by their own statistics
+would leak distributional information and would do so asymmetrically between
+streams of the experiment.
+
+These statistics vary in the fourth decimal place between machines (demetra
+reported 17.8332 / 5.8655 for train). The cause is floating-point accumulation
+order in the dask reduction, not a difference in the data. The value embedded
+in \texttt{1\_nca\_train.pt} is the one to use, so that a single number is
+applied consistently rather than recomputed per run.
+
+\begin{table}[h]
+\begin{tabular}{lrrr}
+\toprule
+File & $X$ shape & $Y$ shape & Size \\
+\midrule
+\texttt{1\_nn\_train.pt}  & $(806949, 6, 1)$ & $(806949, 1)$ & 22.6 MB \\
+\texttt{1\_nn\_val.pt}    & $(266760, 6, 1)$ & $(266760, 1)$ & 7.5 MB \\
+\texttt{1\_nn\_test.pt}   & $(423111, 6, 1)$ & $(423111, 1)$ & 11.8 MB \\
+\texttt{1\_nca\_train.pt} & $(806949, 6, 9)$ & $(806949, 1)$ & 177.5 MB \\
+\texttt{1\_nca\_val.pt}   & $(266760, 6, 9)$ & $(266760, 1)$ & 58.7 MB \\
+\texttt{1\_nca\_test.pt}  & $(423111, 6, 9)$ & $(423111, 1)$ & 93.1 MB \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+All float32, zero NaNs, value ranges 5.4--31.5${}^\circ$C. Each file carries a
+\texttt{config} dictionary alongside $X$ and $Y$ recording the experiment
+number, feature variant, split, date range, dataset id, bounding box and
+normalisation statistics, so that a file can be identified independently of
+its name.
+
+\section{The control was broken, and is now fixed}
+
+As first generated, the two streams were not on the same sample set. The
+\texttt{nca} stream retained $79.42\%$ of the samples the \texttt{nn} stream
+did, identically in every split: 1016037 against 806949 for train, 335880
+against 266760 for val, 532743 against 423111 for test.
+
+Both extractors crop to the same interior cells, so the candidate sets were
+identical. The divergence came from the NaN mask, which dropped any sample with
+a missing value anywhere in its features. For \texttt{nn} that condition
+involved the centre cell alone; for \texttt{nca} it involved all nine. Every
+cell with a land or missing neighbour therefore survived in \texttt{nn} and was
+dropped in \texttt{nca}: the whole coastline ring.
+
+This defeated the purpose of the ablation. The dropped $20.58\%$ was not a
+random subset but precisely the coast-adjacent cells, which are plausibly the
+hardest to predict --- shallower water, stronger diurnal and terrestrial
+forcing. The \texttt{nn} stream was thus scored on a harder cell population than
+the \texttt{nca} stream, and any MAE gap between them would have confounded the
+effect of the CA framing with the effect of a different evaluation set. The
+confound ran in the direction that flatters \texttt{nca}, which is the direction
+the chapter's claim would benefit from, so it could not be left unaddressed.
+
+That the ratio was identical to four decimal places across three independent
+splits confirmed the cause was fixed geometry, a land mask, and not anything
+data-dependent.
+
+\subsection*{Options considered}
+\begin{enumerate}
+  \item Apply the \texttt{nca} validity mask to both experiment streams. Restricts
+    \texttt{nn} to the same 806949 cells, restores exact pairing and makes
+    per-cell paired tests possible. Costs $20\%$ of the \texttt{nn} data,
+    which is not a real loss here since the comparison is the point.
+  \item Keep both as generated, report the cell counts explicitly and refuse
+    any cross-stream comparison. This effectively abandons experiment 1.
+  \item Pad or impute missing neighbours so that \texttt{nca} retains the
+    coastal cells. Relates to the existing TODO in \texttt{extractors.py} on
+    non-full neighborhoods, and raises its own question of what a synthetic
+    neighbour means physically at a coastline.
+  \item Think deeper and come up with a strategy to deal better with land cells.
+  This was a weak point which was also pointed out by a referee on the paper
+  published in \(\mathrm{ACRI}\).
+\end{enumerate}
+
+\subsection*{Resolution}
+
+Option 1 is implemented. The mask is now computed by a single function,
+\texttt{neighborhood\_valid\_mask}, which derives validity from the grid rather
+than from the feature tensor: a cell is valid if and only if its full
+$3 \times 3$ neighborhood is finite at every timestep and its target is finite.
+Both extractors receive the same boolean mask. The criterion is deliberately
+stricter than \texttt{nn} requires, since \texttt{nn} only ever reads the centre
+cell.
+
+The point of computing the mask from the grid rather than from $X_t$ is that
+masking on $X_t$ makes the criterion depend on the feature count, which is
+exactly what produced the divergence. The function carries a comment recording
+this, so that the apparently redundant second \texttt{unfold} is not optimised
+away later.
+
+Sample counts now match exactly: 806949, 266760 and 423111 for both streams,
+in the same row-major order, so index $i$ refers to the same grid point in both
+tensors and per-cell paired tests are available.
+
+Two secondary observations corroborate the fix. The \texttt{nn} value ranges now
+sit strictly inside the \texttt{nca} ranges --- train $X$ minimum rises from
+5.388 to 5.814 --- because the extreme values previously present in \texttt{nn}
+came from coastal cells that no longer survive. And \texttt{nn}'s $X$ range now
+coincides exactly with its $Y$ range in every split, as it must when both are
+drawn from the same cell set.
+
+Options 3 and 4 remain open, and belong in a later experiment: they change what
+\texttt{nca} denotes rather than holding it fixed. Option 4 is the most
+interesting one, but I doubt I'll have time to think about it. You're welcome to
+contribute any ideas you might have.
+
+\section{Pipeline changes}
+
+The download is now separated from the extraction. \texttt{src/data/download.py}
+fetches each split once to local netCDF under \texttt{data/raw/} and skips files
+that already exist; \texttt{--force} re-fetches. \texttt{prep.py} reads from
+those local files and performs no network access. Running both feature variants
+therefore costs one download rather than two, and re-running an extraction after
+a code change costs none at all.
+
+Inspecting the downloaded files revealed that the subset was being fetched with
+all 141 depth levels, of which only the surface is ever used --- 1.4 GB per split
+where tens of megabytes suffice. The download now bounds depth explicitly. The
+selected level is unchanged, and the regenerated tensors are identical in shape
+and sample count to those produced from the full-depth files.
+
+The pipeline also runs locally now, in a conda environment (\texttt{nca},
+Python 3.11, CPU-only torch) specified by \texttt{env/carnn\_env\_min.yml}. A
+full transitive pin is recorded alongside it in \texttt{env/carnn\_env.yml}.
+Generation takes a few minutes per stream on the laptop, which removes the
+dependency on cluster queue availability for iteration. Training runs still
+belong on demetra.
+
+To reproduce: \texttt{python -m src.data.download}, then
+\texttt{python -m src.data.prep --experiment 1 --features nca} and again with
+\texttt{--features nn}. On demetra, \texttt{sbatch src/data/prep.slurm} from the
+repository root with \texttt{carnn\_venv} active.
+
+\end{document}
