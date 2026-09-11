@@ -1,0 +1,493 @@
+<!--
+  Draft blog entry. Starting point for the Flask blog — move the <style> into a
+  shared stylesheet and this markup into a Jinja template when that's set up.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gradients through time</title>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+<style>
+  :root {
+    --ink: #1a1a1a;
+    --muted: #6b6b6b;
+    --rule: #e2e2e2;
+    --accent: #b5502f;
+    --code-bg: #f6f5f2;
+    --paper: #fdfcfa;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Iowan Old Style", "Palatino Linotype", Georgia, "Times New Roman", serif;
+    line-height: 1.65;
+  }
+
+  main {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 4rem 1.5rem 6rem;
+  }
+
+  .kicker {
+    font-family: "Courier New", monospace;
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.75rem;
+  }
+
+  h1 {
+    font-size: 2.1rem;
+    line-height: 1.25;
+    margin: 0 0 0.5rem;
+    font-weight: 600;
+  }
+
+  .subtitle {
+    color: var(--muted);
+    font-size: 1.05rem;
+    font-style: italic;
+    margin: 0 0 2.5rem;
+  }
+
+  h2 {
+    font-size: 1.35rem;
+    margin: 2.75rem 0 1rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  h3 {
+    font-size: 1.05rem;
+    margin: 1.75rem 0 0.75rem;
+    color: var(--ink);
+  }
+
+  p { margin: 0 0 1.1rem; }
+
+  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid currentColor; }
+  a:hover { opacity: 0.75; }
+
+  .eq-block {
+    overflow-x: auto;
+    margin: 1.4rem 0;
+    padding: 0.9rem 0;
+  }
+
+  .eq-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .eq-tag {
+    color: var(--muted);
+    font-family: "Courier New", monospace;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+  }
+
+  .note {
+    border-left: 3px solid var(--accent);
+    background: var(--code-bg);
+    padding: 0.9rem 1.1rem;
+    margin: 1.4rem 0;
+    font-size: 0.95rem;
+  }
+
+  .note p:last-child { margin-bottom: 0; }
+
+  .note .label {
+    font-family: "Courier New", monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 0.4rem;
+  }
+
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 1rem 1.1rem;
+    overflow-x: auto;
+    font-size: 0.85rem;
+    line-height: 1.55;
+    margin: 1.2rem 0;
+  }
+
+  code {
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+
+  p code, li code {
+    background: var(--code-bg);
+    padding: 0.1em 0.35em;
+    border-radius: 3px;
+    font-size: 0.9em;
+  }
+
+  .file-tag {
+    color: var(--muted);
+    font-family: "Courier New", monospace;
+    font-size: 0.78rem;
+    display: block;
+    margin: -0.7rem 0 0.6rem;
+  }
+
+  ul, ol { padding-left: 1.3rem; margin: 0 0 1.1rem; }
+  li { margin-bottom: 0.4rem; }
+
+  .refs {
+    margin-top: 3rem;
+    padding-top: 1.2rem;
+    border-top: 1px solid var(--rule);
+    font-size: 0.88rem;
+    color: var(--muted);
+  }
+
+  .refs p { margin-bottom: 0.6rem; }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #e8e6e1;
+      --muted: #9b9890;
+      --rule: #333230;
+      --accent: #e08a63;
+      --code-bg: #232220;
+      --paper: #161513;
+    }
+  }
+</style>
+</head>
+<body>
+<main>
+
+  <p class="kicker">CA_RNN — training notes</p>
+  <h1>Gradients through time</h1>
+  <p class="subtitle">what <code>loss.backward()</code> is actually doing inside a recurrent model, and why the loss printed <code>0.0000</code> until it didn't</p>
+
+  <p>
+    I recently caught a bug in my training loop: an epoch's average loss was
+    computed by dividing by the number of <em>samples</em> instead of the
+    number of <em>batches</em>, quietly shrinking a perfectly normal loss
+    value into something that rounded to zero at four decimal places. Chasing
+    it down meant going back to first principles &mdash; what a gradient
+    actually is, and what backpropagation is doing to produce the numbers my
+    training loop logs every epoch. These are my notes, worked out against
+    Chapter 2 and Chapter 13 of Simone Scardapane's
+    <a href="https://arxiv.org/abs/2404.17625" target="_blank" rel="noopener">
+      <em>Alice's Adventures in a Differentiable Wonderland</em></a>, and
+    grounded in the <code>VanillaRNN</code>, <code>GRU</code>, and
+    <code>LSTM</code> models I'm actually training.
+  </p>
+
+  <h2>1. Derivative &rarr; gradient &rarr; Jacobian</h2>
+
+  <p>
+    A derivative is defined for a scalar function of a scalar input,
+    <span class="math">\(f'(x) = \lim_{h \to 0} \frac{f(x+h) - f(x)}{h}\)</span>.
+    Once the input becomes a vector <span class="math">\(\mathbf{x} \sim (d)\)</span>,
+    you have to pick a direction to perturb it in. Perturbing along one axis
+    at a time gives a <em>partial derivative</em>; stacking all <span class="math">\(d\)</span>
+    of them gives the <strong>gradient</strong>:
+  </p>
+
+  <div class="eq-block">
+    <div class="eq-row">
+      <span class="math">\[
+        \nabla f(\mathbf{x}) = \partial f(\mathbf{x}) =
+        \begin{bmatrix} \partial_{x_1} f(\mathbf{x}) \\ \vdots \\ \partial_{x_d} f(\mathbf{x}) \end{bmatrix}
+      \]</span>
+      <span class="eq-tag">Def. D.2.6</span>
+    </div>
+  </div>
+
+  <p>
+    That's the case for a scalar <em>output</em>. If the output is also a
+    vector <span class="math">\(\mathbf{y} \sim (o)\)</span>, you need one
+    gradient per output component, stacked into an <span class="math">\((o, d)\)</span>
+    matrix called the <strong>Jacobian</strong>:
+  </p>
+
+  <div class="eq-block">
+    <div class="eq-row">
+      <span class="math">\[
+        \partial f(\mathbf{x}) =
+        \begin{pmatrix}
+          \frac{\partial y_1}{\partial x_1} & \cdots & \frac{\partial y_1}{\partial x_d} \\
+          \vdots & \ddots & \vdots \\
+          \frac{\partial y_o}{\partial x_1} & \cdots & \frac{\partial y_o}{\partial x_d}
+        \end{pmatrix} \sim (o, d)
+      \]</span>
+      <span class="eq-tag">Def. D.2.7</span>
+    </div>
+  </div>
+
+  <p>
+    A gradient is just the Jacobian's special case when <span class="math">\(o = 1\)</span>.
+    The reason this matters for training: composing functions composes their
+    Jacobians by matrix multiplication,
+  </p>
+
+  <div class="eq-block">
+    <div class="eq-row">
+      <span class="math">\[ \partial [f(g(\mathbf{x}))] = [\partial f(\bullet)]\,\partial g(\mathbf{x}) \]</span>
+      <span class="eq-tag">E.2.23</span>
+    </div>
+  </div>
+
+  <p>
+    A neural network is nothing but a long composition of functions
+    (matmuls, nonlinearities, recurrent steps), so its loss's gradient with
+    respect to any parameter is, in principle, a long chain of Jacobian
+    multiplications. In practice nobody ever materializes those matrices.
+  </p>
+
+  <h2>2. Reverse-mode autodiff: what <code>.backward()</code> does</h2>
+
+  <p>
+    Because the final output of a network is a single scalar (the loss),
+    the leftmost term in the full chain is a row vector, not a matrix. That
+    means the whole chain can be computed right-to-left as a sequence of
+    cheap vector&ndash;matrix products instead of ever forming a full
+    Jacobian:
+  </p>
+
+  <div class="eq-block">
+    <div class="eq-row">
+      <span class="math">\[ \nabla_{\mathbf{w}_i} y = \mathbf{1}^\top \big[\partial_{\mathbf{h}_{l-1}} \mathbf{h}_l\big] \cdots \big[\partial_{\mathbf{h}_i} \mathbf{h}_{i+1}\big] \big[\partial_{\mathbf{w}_i} \mathbf{h}_i\big] \]</span>
+      <span class="eq-tag">E.6.2</span>
+    </div>
+  </div>
+
+  <p>
+    Working right-to-left, each step updates a running row vector &mdash; the
+    <strong>adjoint</strong> &mdash; by multiplying it with the next local
+    Jacobian:
+  </p>
+
+  <div class="eq-block">
+    <div class="eq-row">
+      <span class="math">\[ \widetilde{\mathbf{h}} \leftarrow \widetilde{\mathbf{h}}\big[\partial_{\mathbf{h}_{i-1}} \mathbf{h}_i\big] \]</span>
+      <span class="eq-tag">E.6.3</span>
+    </div>
+  </div>
+
+  <p>
+    This is exactly reverse-mode automatic differentiation, a.k.a.
+    backpropagation: run the forward pass once, storing intermediate
+    activations, then walk backward multiplying adjoints by local Jacobians
+    until you reach a leaf parameter. That's what happens, layer by layer,
+    inside every <code>loss.backward()</code> call.
+  </p>
+
+  <h2>3. A recurrent layer, concretely</h2>
+
+  <p>
+    Strip a recurrent layer down to its two functions &mdash; a state
+    transition <span class="math">\(f\)</span> and a readout
+    <span class="math">\(g\)</span>:
+  </p>
+
+  <div class="eq-block">
+    <div class="eq-row">
+      <span class="math">\[ \mathbf{s}_i = f(\mathbf{s}_{i-1}, \mathbf{x}_i), \qquad \mathbf{h}_i = g(\mathbf{s}_i, \mathbf{x}_i) \]</span>
+      <span class="eq-tag">Def. D.13.1</span>
+    </div>
+  </div>
+
+  <p>
+    The classic ("vanilla"/Elman) recurrent layer instantiates both as
+    linear maps followed by a nonlinearity:
+  </p>
+
+  <div class="eq-block">
+    <div class="eq-row">
+      <span class="math">\[
+        f(\mathbf{s}_{i-1}, \mathbf{x}_i) = \phi(\mathbf{A}\mathbf{s}_{i-1} + \mathbf{B}\mathbf{x}_i),
+        \qquad
+        g(\mathbf{s}_i, \mathbf{x}_i) = \mathbf{C}\mathbf{s}_i + \mathbf{D}\mathbf{x}_i
+      \]</span>
+      <span class="eq-tag">E.13.14&ndash;15</span>
+    </div>
+  </div>
+
+  <p>This is precisely what <code>nn.RNN</code> wraps in the project's model:</p>
+  <span class="file-tag">src/models/VanillaRNN.py</span>
+  <pre><code>class VanillaRNN(nn.Module):
+    def __init__(self, input_dim, hidden_dim, output_dim, num_layers=1):
+        super().__init__()
+        self.rnn = nn.RNN(input_dim, hidden_dim, num_layers, batch_first=True)
+        self.fc = nn.Linear(hidden_dim, output_dim)
+
+    def forward(self, x):
+        out, _ = self.rnn(x)
+        out = self.fc(out[:, -1, :])
+        return out</code></pre>
+  <p>
+    <code>self.rnn</code> is <span class="math">\(f\)</span> applied once per
+    timestep in the sequence; <code>self.fc</code> applied to the final
+    hidden state is <span class="math">\(g\)</span>, evaluated only at the
+    last <span class="math">\(i\)</span> since that's all this project's
+    forecasting task needs.
+  </p>
+
+  <h2>4. Backprop through time, and why gradients explode or vanish</h2>
+
+  <p>
+    Unroll the transition function over a sequence of length
+    <span class="math">\(n\)</span> and ask: how does the final state
+    <span class="math">\(\mathbf{s}_n\)</span> depend on the shared weight
+    matrix <span class="math">\(\mathbf{A}\)</span>? Because
+    <span class="math">\(\mathbf{A}\)</span> is reused at every step, its
+    total gradient is a sum over every timestep's contribution, each one
+    weighted by a cumulative product of Jacobians reaching back from the end
+    of the sequence:
+  </p>
+
+  <div class="eq-block">
+    <div class="eq-row">
+      <span class="math">\[ \widetilde{\mathbf{s}}_i = \prod_{j=i+1}^{n} \partial_{\mathbf{s}_{j-1}} f(\mathbf{s}_{j-1}, \mathbf{x}_j) \]</span>
+      <span class="eq-tag">E.13.16</span>
+    </div>
+  </div>
+
+  <div class="eq-block">
+    <div class="eq-row">
+      <span class="math">\[ \partial_{\mathbf{A}} \mathbf{s}_n = \partial_{\mathbf{A}} f(\mathbf{s}_{n-1}, \mathbf{x}_n) + \sum_{i=1}^{n-1} \widetilde{\mathbf{s}}_i \big[\partial_{\mathbf{A}} f(\mathbf{s}_{i-1}, \mathbf{x}_i)\big] \]</span>
+      <span class="eq-tag">E.13.17</span>
+    </div>
+  </div>
+
+  <p>
+    Written this way, reverse-mode autodiff over a recurrent layer is called
+    <strong>backpropagation through time</strong> (BPTT). It's the same
+    adjoint recursion from Section&nbsp;2, just walking backward one
+    timestep at a time instead of one network layer at a time.
+  </p>
+
+  <div class="note">
+    <span class="label">why this matters in practice</span>
+    <p>
+      Each factor in the cumulative product <span class="math">\(\widetilde{\mathbf{s}}_i\)</span>
+      involves the derivative of the activation function, multiplied
+      repeatedly. If those factors are consistently &lt;1, the product
+      shrinks toward zero over long sequences (<strong>vanishing
+      gradients</strong>); if consistently &gt;1, it blows up
+      (<strong>exploding gradients</strong>). This is exactly what the
+      per-parameter gradient norms in my training loop are meant to catch.
+    </p>
+  </div>
+
+  <p>This is the block that logs it, right after <code>loss.backward()</code>:</p>
+  <span class="file-tag">src/utils/train_loop.py</span>
+  <pre><code>with torch.no_grad():
+    for name, param in model.named_parameters():
+        if param.grad is not None:
+            grad_norm = param.grad.norm().item()
+            if name not in grad_history:
+                grad_history[name] = []
+            grad_history[name].append(grad_norm)</code></pre>
+  <p>
+    <code>param.grad</code> at this point <em>is</em> the fully chain-ruled
+    quantity from (E.13.17) &mdash; PyTorch's autograd engine walked the
+    unrolled sequence backward and accumulated it for us. Watching
+    <code>grad_history</code> per layer, per epoch, is a cheap way to see
+    vanishing/exploding gradients happening in a <code>VanillaRNN</code>
+    before they show up as a stalled or diverging loss curve. (This history
+    is currently computed but not yet plotted anywhere &mdash; a natural
+    next step.)
+  </p>
+
+  <h2>5. Where gating comes in</h2>
+
+  <p>
+    The book's fix for vanishing gradients is a <strong>gate</strong>: a
+    sigmoid layer <span class="math">\(\gamma \in [0,1]\)</span> that decides,
+    per feature, whether to overwrite the state or keep it untouched:
+  </p>
+
+  <div class="eq-block">
+    <div class="eq-row">
+      <span class="math">\[
+        f(\mathbf{s}_{i-1}, \mathbf{x}_i) =
+        \gamma(\mathbf{s}_{i-1}, \mathbf{x}_i) \odot \phi(\mathbf{A}\mathbf{s}_{i-1} + \mathbf{B}\mathbf{x}_i)
+        + \big(1 - \gamma(\mathbf{s}_{i-1}, \mathbf{x}_i)\big) \odot \mathbf{s}_{i-1}
+      \]</span>
+      <span class="eq-tag">Li-GRU gate</span>
+    </div>
+  </div>
+
+  <p>
+    When <span class="math">\(\gamma \approx 1\)</span>, that timestep's
+    factor in the BPTT product (E.13.16) is close to identity &mdash; the
+    gradient passes through largely unscaled, which is precisely what
+    prevents the vanishing behaviour above over long sequences. GRU adds a
+    second ("reset") gate on top of this; LSTM adds a third ("forget") gate
+    and a separate cell state. Both are exactly the models this project
+    trains alongside the vanilla RNN:
+  </p>
+  <span class="file-tag">src/models/gru.py</span>
+  <pre><code>self.gru = nn.GRU(input_size=input_dim, hidden_size=hidden_dim,
+                   num_layers=num_layers, batch_first=True)</code></pre>
+  <span class="file-tag">src/models/lstm.py</span>
+  <pre><code>self.lstm = nn.LSTM(input_size=input_dim, hidden_size=hidden_dim,
+                     num_layers=num_layers, batch_first=True)</code></pre>
+  <p>
+    Same <span class="math">\(f, g\)</span> abstraction as the vanilla RNN,
+    just with the internal gating machinery swapped in &mdash; which is also
+    why <code>exp1_gru.py</code>, <code>exp1_lstm.py</code>, and
+    <code>exp1_rnn.py</code> in this project share almost identical Optuna
+    search code and only swap the model class.
+  </p>
+
+  <h2>Next</h2>
+  <p>
+    A natural follow-up post: actually plot <code>grad_history</code> across
+    epochs for the RNN, GRU, and LSTM runs side by side, and see whether the
+    vanilla RNN's gradient norms decay faster over the six-step sequence
+    length used in this project's data than the gated models' do.
+  </p>
+
+  <div class="refs">
+    <p>
+      Equations and definitions cited from Simone Scardapane,
+      <em>&ldquo;Alice's Adventures in a Differentiable Wonderland, Vol. I: A Tour of the Land&rdquo;</em>,
+      <a href="https://arxiv.org/abs/2404.17625" target="_blank" rel="noopener">arXiv:2404.17625</a>,
+      &sect;2.2 (Gradients and Jacobians), &sect;6.3 (Reverse-mode differentiation), &sect;13.2 (Classical recurrent layers).
+    </p>
+  </div>
+
+</main>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    if (window.renderMathInElement) {
+      renderMathInElement(document.body, {
+        delimiters: [
+          { left: "\\[", right: "\\]", display: true },
+          { left: "\\(", right: "\\)", display: false }
+        ]
+      });
+    }
+  });
+</script>
+
+</body>
+</html>

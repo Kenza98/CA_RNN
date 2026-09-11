@@ -1,0 +1,21 @@
+ca_viz_app/
+├── README.md
+├── requirements.txt
+├── config.yaml
+├── main.py
+├── data/
+│   ├── sst_ground_truth.nc          # Reanalysis SST (time, lat, lon)
+│   └── sst_gru_predictions.nc       # GRU predictions on same grid
+├── src/
+│   ├── __init__.py
+│   ├── visualizer.py                # CellularAutomatonVisualizer class
+│   ├── data_loader.py               # Load NetCDF grids
+│   └── colormap.py                  # Temperature → color mapping
+├── models/
+│   └── gru_best.pt
+└── output/
+    └── frames/                      # Saved frames (optional)
+
+Goal: Represent CA lattice with fixed color for land pixels, and water pixels are initially blue,
+because the initial configuration is identical to reality, but as it evolves, the gap between
+reality and prediction gets bigger through configurations.
