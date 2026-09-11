@@ -39,7 +39,7 @@ def train_model(model, train_loader, optimizer, criterion, num_epochs, device):
             optimizer.step()
             epoch_loss += loss.item()
         
-        epoch_avg_loss = epoch_loss / N
+        epoch_avg_loss = epoch_loss / len(train_loader)
         train_loss.append(epoch_avg_loss)
         epoch_time = time.time() - epoch_start
         
@@ -52,6 +52,6 @@ def train_model(model, train_loader, optimizer, criterion, num_epochs, device):
         ram_mb = process.memory_info().rss / 1024**2
         print(f"CPU: {cpu_pct:.1f}% | RAM: {ram_mb:.1f}MB")
 
-        print(f"Loss: {epoch_avg_loss:.4f}\nTime: {epoch_time/60:.2f}min", flush=True)
+        print(f"Loss: {epoch_avg_loss:.8f}\nTime: {epoch_time/60:.2f}min", flush=True)
     
     return train_loss, grad_history
