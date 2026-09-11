@@ -1,16 +1,19 @@
 import time
 import torch
-    
+import psutil
+
 def train_model(model, train_loader, optimizer, criterion, num_epochs, device):
     """Generic training loop for RNN-based models."""
-    
+
     N = len(train_loader.dataset)
+    process = psutil.Process()
     train_loss = []
     grad_history = {}
     
     model.to(device)
     model.train()
-    
+    process.cpu_percent()  # prime for per-epoch readings below
+
     for epoch in range(num_epochs):
         print(f"Epoch {epoch+1}/{num_epochs}\ncomputing ...\n...\n...")
         epoch_start = time.time()
@@ -44,7 +47,11 @@ def train_model(model, train_loader, optimizer, criterion, num_epochs, device):
             mem_alloc = torch.cuda.memory_allocated(device) / 1024**2
             mem_reserved = torch.cuda.memory_reserved(device) / 1024**2
             print(f"GPU Mem: {mem_alloc:.1f}MB/{mem_reserved:.1f}MB")
-        
+
+        cpu_pct = process.cpu_percent()
+        ram_mb = process.memory_info().rss / 1024**2
+        print(f"CPU: {cpu_pct:.1f}% | RAM: {ram_mb:.1f}MB")
+
         print(f"Loss: {epoch_avg_loss:.4f}\nTime: {epoch_time/60:.2f}min", flush=True)
     
     return train_loss, grad_history

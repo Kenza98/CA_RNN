@@ -1,6 +1,5 @@
 """
 Train a Vanilla RNN model on experiment 1 data (1_nca_* or 1_nn_*) using Optuna.
-Same search as train_gru_exp1.py, but using the VanillaRNN model.
 """
 
 import torch
@@ -39,9 +38,17 @@ prefix = f"1_{args.dataset}"
 data = torch.load(DATA_DIR / f"{prefix}_train.pt", map_location="cpu", weights_only=False)
 X, Y = data["X"], data["Y"]
 
+# normalize using training set statistics
+mean = data["config"]["global_mean"]
+std = data["config"]["global_std"]
+X = (X - mean) / std
+Y = (Y - mean) / std
+
 # validation set
 val_data = torch.load(DATA_DIR / f"{prefix}_val.pt", map_location="cpu", weights_only=False)
 X_val, Y_val = val_data["X"], val_data["Y"]
+X_val = (X_val - mean) / std
+Y_val = (Y_val - mean) / std
 
 input_dim = X.shape[-1]
 output_dim = 1
@@ -85,7 +92,6 @@ print("\n=== Optuna Search Complete ===")
 print(f"Best val MSE: {study.best_value:.6f}")
 print(f"Best params: {study.best_params}")
 
-import pandas as pd
 df = study.trials_dataframe()
 df.to_csv(OUT_DIR / f"optuna_rnn_{prefix}_results_{run_id}.csv", index=False)
 print(f"Saved trial results to {OUT_DIR}/optuna_rnn_{prefix}_results_{run_id}.csv")
