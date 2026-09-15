@@ -52,8 +52,8 @@ def load_dataset(split_name, chunk_size=200):
     sst = ds["thetao"]
     if "depth" in sst.dims:
         sst = sst.isel(depth=0)
-        #print(sst.dtype)
-    return ds, sst 
+        # print(sst.dtype)
+    return ds, sst
 
 
 def build_learning_set(sst, extractor, seq_length=6, chunk_size=200):
@@ -119,7 +119,9 @@ def main():
     for split_name, (sd, ed) in SPLITS.items():
         print(f"\n------ {split_name}: {sd} -> {ed} ------", flush=True)
         ds, sst = load_dataset(split_name)
-        X, Y, global_mean, global_std = build_learning_set(sst, extractor)
+        X, Y, global_mean, global_std = build_learning_set(
+            sst, extractor, seq_length=args.seq_length, chunk_size=args.chunk_size
+        )
         print(f"X: {tuple(X.shape)}  Y: {tuple(Y.shape)}", flush=True)
 
         out = OUT_DIR / f"{args.experiment}_{args.features}_{split_name}.pt"
