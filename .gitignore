@@ -19,7 +19,9 @@ logs/
 */logs/
 
 # batch files
-.slurm
+*.save
+*.save.*
+*.slurm
 
 # Any test runs output directories
 runs/
