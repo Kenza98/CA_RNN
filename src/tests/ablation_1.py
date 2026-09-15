@@ -32,13 +32,15 @@ RESULTS_DIR.mkdir(exist_ok=True)
 DATASETS = ["nca", "nn"]
 MODEL_CLASSES = {"gru": GRU, "lstm": LSTM, "rnn": VanillaRNN}
 STATE_DICT_KEYS = {"gru": "GRUStateDict", "lstm": "LSTMStateDict", "rnn": "VanillaRNNStateDict"}
+# train_fixed.py tags checkpoints with model.__class__.__name__.lower(), not the CLI --model value
+CHECKPOINT_PREFIXES = {"gru": "gru", "lstm": "lstm", "rnn": "vanillarnn"}
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}", flush=True)
 
 
 def latest_checkpoint(model_key, dataset):
-    pattern = re.compile(rf"^{model_key}_1_{dataset}_.*\.pt$")
+    pattern = re.compile(rf"^{CHECKPOINT_PREFIXES[model_key]}_1_{dataset}_.*\.pt$")
     matches = sorted(
         (f for f in MODEL_DIR.iterdir() if pattern.match(f.name)),
         key=lambda f: f.stat().st_mtime,
