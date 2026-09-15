@@ -12,6 +12,7 @@ import torch.nn as nn
 import torch.optim as optim
 import os
 from src.utils.train_loop import train_model
+from src.utils.seed import set_seed
 from datetime import datetime
 from src.models.lstm import LSTM
 
@@ -24,7 +25,10 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--dataset", choices=["nca", "nn"], required=True, help="Which experiment-1 dataset to train on")
 parser.add_argument("--use-gpu", action="store_true", help="Use GPU if CUDA module available")
 parser.add_argument("--n-trials", type=int, default=100, help="Number of Optuna trials")
+parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
 args = parser.parse_args()
+
+set_seed(args.seed)
 
 device = torch.device("cuda" if (args.use_gpu and torch.cuda.is_available()) else "cpu")
 print(f"Using device: {device}", flush=True)
@@ -86,7 +90,7 @@ def objective(trial):
     return val_mse
 
 
-study = optuna.create_study(direction="minimize")
+study = optuna.create_study(direction="minimize", sampler=optuna.samplers.TPESampler(seed=args.seed))
 study.optimize(objective, n_trials=args.n_trials)
 
 print("\n=== Optuna Search Complete ===")
