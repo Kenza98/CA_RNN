@@ -18,29 +18,28 @@ def train_model(model, train_loader, optimizer, criterion, num_epochs, device):
         print(f"Epoch {epoch+1}/{num_epochs}\ncomputing ...\n...\n...")
         epoch_start = time.time()
         epoch_loss = 0.0
-        
+
         for x_batch, y_batch in train_loader:
             x_batch = x_batch.to(device)
             y_batch = y_batch.to(device)
-            
+
             optimizer.zero_grad()
             y_pred = model(x_batch)
             loss = criterion(y_pred, y_batch)
             loss.backward()
-            
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+
             with torch.no_grad():
                 for name, param in model.named_parameters():
                     if param.grad is not None:
                         grad_norm = param.grad.norm().item()
-                        if name not in grad_history:
-                            grad_history[name] = []
-                        grad_history[name].append(grad_norm)
-            
+                        grad_history.setdefault(name, []).append(grad_norm)
+
             optimizer.step()
             epoch_loss += loss.item()
-        
+            train_loss.append(loss.item())
+
         epoch_avg_loss = epoch_loss / len(train_loader)
-        train_loss.append(epoch_avg_loss)
         epoch_time = time.time() - epoch_start
         
         if device.type == "cuda":
