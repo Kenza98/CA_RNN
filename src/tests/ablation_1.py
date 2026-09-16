@@ -43,7 +43,7 @@ CHECKPOINT_PREFIXES = {"gru": "gru", "lstm": "lstm", "rnn": "vanillarnn"}
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "--model",
-    choices= list(MODEL_CLASSES),
+    choices=list(MODEL_CLASSES),
     default=None,
     help="Evaluate only this model; omit to evaluate all three",
 )
@@ -104,7 +104,7 @@ for dataset in DATASETS:
             "seed": seed,
         }
         if hyperparams and hyperparams != current:
-            #this should only go off if hyperparams had values and changed
+            # this should only go off if hyperparams had values and changed
             print(f"Warning: {model_key}/{dataset} hyperparams differ: {current}")
 
         hyperparams = current
@@ -123,16 +123,26 @@ for dataset in DATASETS:
         test_loader = DataLoader(TensorDataset(X, Y), batch_size=256, shuffle=False)
 
         # get test metrics by calling utils evaluate_model
-        metrics = evaluate_model(model, test_loader, device)
+        metrics = evaluate_model(model, test_loader, device)  # still standardized
         mse = metrics["mse"].item()
         mae = metrics["mae"].item()
-        print(f"- - - >> MSE = {mse:.6f} | >> MAE = {mae:.6f}")
+        # de-standardize
+        mse = mse * global_std**2
+        mae = mae * global_std
+        rmse = mse**0.5
+        print(
+            f"- - - >> MSE = {mse:.6f} °C²\n >> RMSE = {rmse:.6f} °C\n >> MAE = {mae:.6f} °C \n"
+        )
 
-        results.setdefault(dataset, {})[model_key] = {"mse": mse, "mae": mae}
+        results.setdefault(dataset, {})[model_key] = {
+            "mse": mse,
+            "rmse": rmse,
+            "mae": mae,
+        }
 
 suffix = f"_{args.model}" if args.model else ""
 with open(RESULTS_DIR / "ablation_1{suffix}.json", "w") as f:
-    json.dump({"hyperparams": hyperparams, "test results" : results}, f, indent=2)
+    json.dump({"hyperparams": hyperparams, "test results": results}, f, indent=2)
 
 print("\n=== FINAL RESULTS TABLE ===")
 print(f"{'Dataset':<10} {'Model':<10} {'MSE':<12} {'MAE':<12}")
