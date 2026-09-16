@@ -141,14 +141,5 @@ for dataset in DATASETS:
         }
 
 suffix = f"_{args.model}" if args.model else ""
-with open(RESULTS_DIR / "ablation_1{suffix}.json", "w") as f:
+with open(RESULTS_DIR / f"ablation_1{suffix}.json", "w") as f:
     json.dump({"hyperparams": hyperparams, "test results": results}, f, indent=2)
-
-print("\n=== FINAL RESULTS TABLE ===")
-print(f"{'Dataset':<10} {'Model':<10} {'MSE':<12} {'MAE':<12}")
-print("-" * 44)
-for dataset, per_model in results.items():
-    for model_key, metrics in per_model.items():
-        print(
-            f"{dataset:<10} {model_key:<10} {metrics['mse']:<12.6f} {metrics['mae']:<12.6f}"
-        )
