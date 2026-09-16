@@ -31,7 +31,11 @@ RESULTS_DIR.mkdir(exist_ok=True)
 
 DATASETS = ["nca", "nn"]
 MODEL_CLASSES = {"gru": GRU, "lstm": LSTM, "rnn": VanillaRNN}
-STATE_DICT_KEYS = {"gru": "GRUStateDict", "lstm": "LSTMStateDict", "rnn": "VanillaRNNStateDict"}
+STATE_DICT_KEYS = {
+    "gru": "GRUStateDict",
+    "lstm": "LSTMStateDict",
+    "rnn": "VanillaRNNStateDict",
+}
 # train_fixed.py tags checkpoints with model.__class__.__name__.lower(), not the CLI --model value
 CHECKPOINT_PREFIXES = {"gru": "gru", "lstm": "lstm", "rnn": "vanillarnn"}
 
@@ -49,6 +53,7 @@ def latest_checkpoint(model_key, dataset):
 
 
 results = {}
+hyperparams = {}  # first level above "nn" and "nca"
 
 for dataset in DATASETS:
     test_data = torch.load(
@@ -67,31 +72,56 @@ for dataset in DATASETS:
             continue
         print(f"Loading: {model_file}")
 
+        # load the model checkpoint
         checkpoint = torch.load(model_file, map_location="cpu", weights_only=False)
+        # get hyperparams from checkpoint
+        hidden_dim = checkpoint["hidden_dim"]
+        num_layers = checkpoint["num_layers"]
+        lr = checkpoint["lr"]
+        seed = checkpoint["seed"]
+        global_mean = checkpoint["global_mean"]
+        global_std = checkpoint["global_std"]
+
+        current = {
+            "hidden_dim": hidden_dim,
+            "num_layers": num_layers,
+            "lr": lr,
+            "seed": seed,
+        }
+        if hyperparams and hyperparams != current:
+            #this should only go off if hyperparams had values and changed
+            print(f"Warning: {model_key}/{dataset} hyperparams differ: {current}")
+            hyperparams = current
+
+        # load the model from input_dim, hidden_dim, output_dim, num_layers
         model = model_class(
             input_dim,
-            checkpoint["hidden_dim"],
+            hidden_dim,
             output_dim,
-            num_layers=checkpoint["num_layers"],
+            num_layers,
         )
         model.load_state_dict(checkpoint[STATE_DICT_KEYS[model_key]])
 
-        X, Y = normalize(X_test, Y_test, checkpoint["global_mean"], checkpoint["global_std"])
+        # normalize and standardize the results with checkpoint stored stats
+        X, Y = normalize(X_test, Y_test, global_mean, global_std)
         test_loader = DataLoader(TensorDataset(X, Y), batch_size=256, shuffle=False)
 
+        # get test metrics by calling utils evaluate_model
         metrics = evaluate_model(model, test_loader, device)
         mse = metrics["mse"].item()
         mae = metrics["mae"].item()
-        print(f"----> MSE={mse:.6f} | MAE={mae:.6f}")
+        print(f"- - - >> MSE = {mse:.6f} | >> MAE = {mae:.6f}")
 
         results.setdefault(dataset, {})[model_key] = {"mse": mse, "mae": mae}
 
 with open(RESULTS_DIR / "ablation_1.json", "w") as f:
-    json.dump(results, f, indent=2)
+    json.dump({"hyperparams": hyperparams, "test results" : results}, f, indent=2)
 
 print("\n=== FINAL RESULTS TABLE ===")
 print(f"{'Dataset':<10} {'Model':<10} {'MSE':<12} {'MAE':<12}")
 print("-" * 44)
 for dataset, per_model in results.items():
     for model_key, metrics in per_model.items():
-        print(f"{dataset:<10} {model_key:<10} {metrics['mse']:<12.6f} {metrics['mae']:<12.6f}")
+        print(
+            f"{dataset:<10} {model_key:<10} {metrics['mse']:<12.6f} {metrics['mae']:<12.6f}"
+        )
