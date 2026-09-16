@@ -91,7 +91,8 @@ for dataset in DATASETS:
         if hyperparams and hyperparams != current:
             #this should only go off if hyperparams had values and changed
             print(f"Warning: {model_key}/{dataset} hyperparams differ: {current}")
-            hyperparams = current
+
+        hyperparams = current
 
         # load the model from input_dim, hidden_dim, output_dim, num_layers
         model = model_class(
