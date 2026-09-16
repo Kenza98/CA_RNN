@@ -8,6 +8,7 @@ hyperparameter configs, so it's not reused here.
 """
 
 import json
+import argparse
 import re
 import sys
 from pathlib import Path
@@ -39,6 +40,20 @@ STATE_DICT_KEYS = {
 # train_fixed.py tags checkpoints with model.__class__.__name__.lower(), not the CLI --model value
 CHECKPOINT_PREFIXES = {"gru": "gru", "lstm": "lstm", "rnn": "vanillarnn"}
 
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "--model",
+    choices= list(MODEL_CLASSES),
+    default=None,
+    help="Evaluate only this model; omit to evaluate all three",
+)
+
+args = parser.parse_args()
+
+models_to_eval = (
+    {args.model: MODEL_CLASSES[args.model]} if args.model else MODEL_CLASSES
+)
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}", flush=True)
 
@@ -63,7 +78,7 @@ for dataset in DATASETS:
     input_dim = X_test.shape[-1]
     output_dim = 1
 
-    for model_key, model_class in MODEL_CLASSES.items():
+    for model_key, model_class in models_to_eval.items():
         print(f"\n=== {model_key.upper()} on {dataset} ===")
 
         model_file = latest_checkpoint(model_key, dataset)
@@ -115,7 +130,8 @@ for dataset in DATASETS:
 
         results.setdefault(dataset, {})[model_key] = {"mse": mse, "mae": mae}
 
-with open(RESULTS_DIR / "ablation_1.json", "w") as f:
+suffix = f"_{args.model}" if args.model else ""
+with open(RESULTS_DIR / "ablation_1{suffix}.json", "w") as f:
     json.dump({"hyperparams": hyperparams, "test results" : results}, f, indent=2)
 
 print("\n=== FINAL RESULTS TABLE ===")
