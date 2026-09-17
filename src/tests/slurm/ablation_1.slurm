@@ -13,4 +13,4 @@ source ~/.bashrc
 
 conda activate carnn_venv
 
-python -m src.tests.ablation_1
+python -m src.tests.ablation_1 --model lstm --job-id 102059
