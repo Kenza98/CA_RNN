@@ -47,6 +47,11 @@ parser.add_argument(
     default=None,
     help="Evaluate only this model; omit to evaluate all three",
 )
+parser.add_argument(
+    "--job-id",
+    default=None,
+    help="Evaluate this SLURM job's checkpoints; omit for latest",
+)
 
 args = parser.parse_args()
 
@@ -58,7 +63,18 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}", flush=True)
 
 
-def latest_checkpoint(model_key, dataset):
+def latest_checkpoint(model_key, dataset, job_id=None):
+    """
+    This function sorts through all model checkpoints and returns a list of paths
+    to the lastest ones per model type (RNN, LSTM, GRU)
+    """
+    # if the run specified which slurb job id to test, return that one
+    if job_id:
+        f = MODEL_DIR / f"{CHECKPOINT_PREFIXES[model_key]}_1_{dataset}_gpu_{job_id}.pt"
+        print(f)
+        return f if f.exists() else None
+
+    # else, look for latest models
     pattern = re.compile(rf"^{CHECKPOINT_PREFIXES[model_key]}_1_{dataset}_.*\.pt$")
     matches = sorted(
         (f for f in MODEL_DIR.iterdir() if pattern.match(f.name)),
@@ -81,7 +97,7 @@ for dataset in DATASETS:
     for model_key, model_class in models_to_eval.items():
         print(f"\n=== {model_key.upper()} on {dataset} ===")
 
-        model_file = latest_checkpoint(model_key, dataset)
+        model_file = latest_checkpoint(model_key, dataset, args.job_id)
         if model_file is None:
             print(f"No checkpoint found for {model_key}/{dataset}, skipping.")
             continue
@@ -141,5 +157,8 @@ for dataset in DATASETS:
         }
 
 suffix = f"_{args.model}" if args.model else ""
+suffix += f"_{args.job_id}" if args.job_id else ""
+print(f"\n\n {suffix} \n\n")
 with open(RESULTS_DIR / f"ablation_1{suffix}.json", "w") as f:
     json.dump({"hyperparams": hyperparams, "test results": results}, f, indent=2)
+
