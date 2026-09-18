@@ -7,7 +7,7 @@ def train_model(model, optimizer, criterion, data_loader, nb_epochs=30, device="
     train_loss = []
     grad_history = {}
     for epoch in range(nb_epochs):
-        print(f"Epoch {epoch+1}/{nb_epochs}\ncomputing ...\n...\n...")
+        print(f"Epoch {epoch+1}/{nb_epochs} ...computing ...")
         epoch_start = time.time()
         epoch_loss = 0.0
         for x_batch, y_batch in data_loader:
