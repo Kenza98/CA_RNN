@@ -11,7 +11,9 @@ import optuna
 import torch.nn as nn
 import torch.optim as optim
 import os
+import csv
 from src.utils.train_loop import train_model
+from src.utils.evaluate import evaluate_model
 from src.utils.seed import set_seed
 from datetime import datetime
 from src.models.lstm import LSTM
@@ -24,7 +26,7 @@ OUT_DIR = PROJECT_ROOT / "outputs"
 parser = argparse.ArgumentParser()
 parser.add_argument("--dataset", choices=["nca", "nn"], required=True, help="Which experiment-1 dataset to train on")
 parser.add_argument("--use-gpu", action="store_true", help="Use GPU if CUDA module available")
-parser.add_argument("--n-trials", type=int, default=100, help="Number of Optuna trials")
+parser.add_argument("--n-trials", type=int, default=45, help="Number of Optuna trials")
 parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
 args = parser.parse_args()
 
@@ -58,16 +60,29 @@ Y_val = (Y_val - mean) / std
 input_dim = X.shape[-1]
 output_dim = 1
 lr = 1e-4
+num_epochs = 5
+
+train_dataset = TensorDataset(X, Y)
+val_dataset = TensorDataset(X_val, Y_val)
+_loaders = {}
+
+
+def get_loaders(batch_size):
+    """Cache loaders per batch_size so worker processes aren't respawned every trial."""
+    if batch_size not in _loaders:
+        _loaders[batch_size] = (
+            DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=4, persistent_workers=True),
+            DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=4, persistent_workers=True),
+        )
+    return _loaders[batch_size]
 
 
 def objective(trial):
-    hidden_dim = trial.suggest_categorical("hidden_dim", [32, 56, 128, 256])
-    num_layers = trial.suggest_int("num_layers", 1, 5)
+    hidden_dim = trial.suggest_categorical("hidden_dim", [16, 32, 64, 128, 256])
+    num_layers = trial.suggest_int("num_layers", 1, 3)
     batch_size = trial.suggest_categorical("batch_size", [128, 256, 512])
-    num_epochs = trial.suggest_categorical("num_epochs", [3, 5, 10, 20, 30])
 
-    train_loader = DataLoader(TensorDataset(X, Y), batch_size=batch_size, shuffle=True, num_workers=4)
-    val_loader = DataLoader(TensorDataset(X_val, Y_val), batch_size=batch_size, shuffle=False, num_workers=4)
+    train_loader, val_loader = get_loaders(batch_size)
 
     model = LSTM(input_dim, hidden_dim, output_dim, num_layers=num_layers)
     criterion = nn.MSELoss()
@@ -75,28 +90,47 @@ def objective(trial):
 
     train_model(model, train_loader, optimizer, criterion, num_epochs, device)
 
-    model.eval()
-    val_losses = []
-    with torch.no_grad():
-        for X_batch, Y_batch in val_loader:
-            X_batch, Y_batch = X_batch.to(device), Y_batch.to(device)
-            preds = model(X_batch)
-            loss = criterion(preds, Y_batch)
-            val_losses.append(loss.item())
+    # errors are y_hat - y, so the shared mean cancels out on destandardize:
+    # only the std scaling remains (MSE scales by std**2, MAE by std)
+    train_metrics = evaluate_model(model, train_loader, device)
+    val_metrics = evaluate_model(model, val_loader, device)
+    train_loss = train_metrics["mse"].item() * std**2
+    val_mse = val_metrics["mse"].item() * std**2
+    val_mae = val_metrics["mae"].item() * std
 
-    val_mse = sum(val_losses) / len(val_losses)
-    print(f"Trial {trial.number} | hidden={hidden_dim} | Layers={num_layers} | lr={lr:.2e}", flush=True)
-    print(f"bs={batch_size}\n----> val_MSE={val_mse:.6f}", flush=True)
+    trial.set_user_attr("train_loss", train_loss)
+    trial.set_user_attr("val_mae", val_mae)
+
+    print(f"Trial {trial.number} | hidden={hidden_dim} | layers={num_layers} | bs={batch_size} | epochs={num_epochs}", flush=True)
+    print(f"----> train_loss={train_loss:.6f} °C² | val_MSE={val_mse:.6f} °C² | val_MAE={val_mae:.6f} °C", flush=True)
     return val_mse
 
 
+fieldnames = ["model", "hidden_dim", "num_layers", "batch_size", "num_epochs", "train_loss", "val_mse", "val_mae"]
+out_file = OUT_DIR / f"optuna_lstm_{prefix}_results_{run_id}.csv"
+with open(out_file, "w", newline="") as f:
+    csv.DictWriter(f, fieldnames=fieldnames).writeheader()
+
+
+def log_trial(study, trial):
+    """Append this trial's row as soon as it completes, so results survive a crash/timeout."""
+    if trial.value is None:
+        return
+    with open(out_file, "a", newline="") as f:
+        csv.DictWriter(f, fieldnames=fieldnames).writerow({
+            "model": "lstm",
+            "num_epochs": num_epochs,
+            **trial.params,
+            "train_loss": trial.user_attrs.get("train_loss"),
+            "val_mse": trial.value,
+            "val_mae": trial.user_attrs.get("val_mae"),
+        })
+
+
 study = optuna.create_study(direction="minimize", sampler=optuna.samplers.TPESampler(seed=args.seed))
-study.optimize(objective, n_trials=args.n_trials)
+study.optimize(objective, n_trials=args.n_trials, callbacks=[log_trial])
 
 print("\n=== Optuna Search Complete ===")
-print(f"Best val MSE: {study.best_value:.6f}")
+print(f"Best val MSE: {study.best_value:.6f} °C²")
 print(f"Best params: {study.best_params}")
-
-df = study.trials_dataframe()
-df.to_csv(OUT_DIR / f"optuna_lstm_{prefix}_results_{run_id}.csv", index=False)
-print(f"Saved trial results to {OUT_DIR}/optuna_lstm_{prefix}_results_{run_id}.csv")
+print(f"Saved trial results to {out_file}")
