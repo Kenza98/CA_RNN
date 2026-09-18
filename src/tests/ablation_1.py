@@ -11,8 +11,11 @@ import json
 import argparse
 import re
 import sys
+import time
+import threading
 from pathlib import Path
 
+import psutil
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
@@ -61,6 +64,37 @@ models_to_eval = (
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}", flush=True)
+
+_stop_monitor = threading.Event()
+
+
+def _monitor_resources(interval=5):
+    """Background heartbeat: prints machine/process resource usage every `interval`
+    seconds so it's obvious the eval loop is actually computing, not stalled."""
+    process = psutil.Process()
+    process.cpu_percent()  # prime for a meaningful reading below
+    psutil.cpu_percent()
+    start = time.time()
+    while not _stop_monitor.wait(interval):
+        elapsed = time.time() - start
+        sys_cpu = psutil.cpu_percent()
+        proc_cpu = process.cpu_percent()
+        ram_mb = process.memory_info().rss / 1024**2
+        vm = psutil.virtual_memory()
+        msg = (
+            f"[monitor] t+{elapsed:5.0f}s | system CPU: {sys_cpu:5.1f}% "
+            f"| process CPU: {proc_cpu:6.1f}% | process RAM: {ram_mb:7.1f}MB "
+            f"| system RAM used: {vm.percent:4.1f}%"
+        )
+        if device.type == "cuda":
+            mem_alloc = torch.cuda.memory_allocated(device) / 1024**2
+            mem_reserved = torch.cuda.memory_reserved(device) / 1024**2
+            msg += f" | GPU mem: {mem_alloc:.1f}/{mem_reserved:.1f}MB"
+        print(msg, flush=True)
+
+
+monitor_thread = threading.Thread(target=_monitor_resources, daemon=True)
+monitor_thread.start()
 
 
 def latest_checkpoint(model_key, dataset, run_id=None):
@@ -161,4 +195,7 @@ suffix += f"_{args.run_id}" if args.run_id else ""
 print(f"\n\n {suffix} \n\n")
 with open(RESULTS_DIR / f"ablation_1{suffix}.json", "w") as f:
     json.dump({"hyperparams": hyperparams, "test results": results}, f, indent=2)
+
+_stop_monitor.set()
+monitor_thread.join(timeout=1)
 
