@@ -31,7 +31,7 @@ def parse_args():
     p.add_argument(
         "--experiment",
         type=int,
-        required=True,
+        default=1,
         help="Experiment number, used in the output filename",
     )
     p.add_argument(

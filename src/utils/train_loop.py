@@ -15,7 +15,7 @@ def train_model(model, train_loader, optimizer, criterion, num_epochs, device):
     process.cpu_percent()  # prime for per-epoch readings below
 
     for epoch in range(num_epochs):
-        print(f"Epoch {epoch+1}/{num_epochs}\ncomputing ...\n...\n...")
+        print(f"Epoch {epoch+1}/{num_epochs}")
         epoch_start = time.time()
         epoch_loss = 0.0
 
