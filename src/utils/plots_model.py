@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 #\\TODO change out_dir to fp in mooreRNN
 
-def plot_loss_per_epoch(train_loss, fp):
+def plot_loss_per_epoch(train_loss, fp, model_name=None, dataset=None):
     ###
     # train_loss : per-step (per-batch) training loss, not averaged per epoch
     # out_dir : path to output directory
@@ -11,7 +11,10 @@ def plot_loss_per_epoch(train_loss, fp):
     ax.plot(train_loss, label="Train MSE")
     ax.set_xlabel("Training Step")
     ax.set_ylabel("MSE Loss")
-    ax.set_title("Training Loss Over Training Steps")
+    title = "Training Loss Over Training Steps"
+    if model_name and dataset:
+        title = f"{model_name} on {dataset} — {title}"
+    ax.set_title(title)
     ax.legend()
 
     fig.tight_layout()
