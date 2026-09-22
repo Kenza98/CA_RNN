@@ -149,13 +149,15 @@ fieldnames = [
     "val_mse",
     "val_mae",
 ]
+
 out_file = OUT_DIR / f"optuna_rnn_{prefix}_results_{run_id}.csv"
 with open(out_file, "w", newline="") as f:
     csv.DictWriter(f, fieldnames=fieldnames).writeheader()
 
-
 def log_trial(study, trial):
-    """Append this trial's row as soon as it completes, so results survive a crash/timeout."""
+    """Append this trial's row as soon as it completes,
+    so results survive a crash/timeout."""
+
     if trial.value is None:
         return
     with open(out_file, "a", newline="") as f:
@@ -180,6 +182,7 @@ study = optuna.create_study(
     load_if_exists=True,
 )
 study.optimize(objective, n_trials=args.n_trials, callbacks=[log_trial])
+
 
 print("\n=== Optuna Search Complete ===")
 print(f"Best val MSE: {study.best_value:.6f} °C²")
