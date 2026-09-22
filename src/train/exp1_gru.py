@@ -22,6 +22,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
 MODEL_DIR = PROJECT_ROOT / "models"
 OUT_DIR = PROJECT_ROOT / "outputs"
+OPTUNA_DIR = PROJECT_ROOT / "optuna"
+OPTUNA_DIR.mkdir(exist_ok=True)
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -171,8 +173,13 @@ def log_trial(study, trial):
         )
 
 
+study_name = f"gru_{prefix}"
 study = optuna.create_study(
-    direction="minimize", sampler=optuna.samplers.TPESampler(seed=args.seed)
+    direction="minimize",
+    sampler=optuna.samplers.TPESampler(seed=args.seed),
+    storage=f"sqlite:///{OPTUNA_DIR / study_name}.db",
+    study_name=study_name,
+    load_if_exists=True,
 )
 study.optimize(objective, n_trials=args.n_trials, callbacks=[log_trial])
 
