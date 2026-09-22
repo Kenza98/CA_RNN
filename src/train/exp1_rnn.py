@@ -75,7 +75,7 @@ Y_val = (Y_val - mean) / std
 input_dim = X.shape[-1]
 output_dim = 1
 lr = 1e-4
-num_epochs = 5
+num_epochs = 10
 
 train_dataset = TensorDataset(X, Y)
 val_dataset = TensorDataset(X_val, Y_val)
@@ -106,7 +106,7 @@ def get_loaders(batch_size):
 
 def objective(trial):
     hidden_dim = trial.suggest_categorical("hidden_dim", [16, 32, 64, 128, 256])
-    num_layers = trial.suggest_int("num_layers", 1, 3)
+    num_layers = trial.suggest_int("num_layers", 1, 2)
     batch_size = trial.suggest_categorical("batch_size", [128, 256, 512])
 
     train_loader, val_loader = get_loaders(batch_size)
