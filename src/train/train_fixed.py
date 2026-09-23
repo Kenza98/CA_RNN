@@ -54,7 +54,7 @@ parser.add_argument(
     "--num-layers", type=int, default=1, help="Number of stacked recurrent layers"
 )
 parser.add_argument("--num-epochs", type=int, default=3, help="Training epochs")
-parser.add_argument("--batch-size", type=int, default=256)
+parser.add_argument("--batch-size", type=int, default=512)
 parser.add_argument("--lr", type=float, default=1e-4)
 args = parser.parse_args()
 
