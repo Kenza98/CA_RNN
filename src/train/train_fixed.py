@@ -23,7 +23,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from src.utils.seed import set_seed
 from src.utils.train_loop import train_model
 from src.utils.normalize import normalize
-from src.utils.plots_model import plot_loss_per_epoch, plot_grad_hist
+from src.utils.plots_model import plot_loss_per_epoch, plot_loss_convergence, plot_grad_hist
 from src.models.gru import GRU
 from src.models.lstm import LSTM
 from src.models.VanillaRNN import VanillaRNN
@@ -118,5 +118,9 @@ model_file = MODEL_DIR / f"{tag}.pt"
 torch.save(checkpoint, model_file)
 print(f"Saved to {model_file}", flush=True)
 
-plot_loss_per_epoch(train_loss, OUT_DIR / f"{tag}_train_loss.png")
-plot_grad_hist(grad_history, OUT_DIR / f"{tag}_grad.png")
+#plot_loss_per_epoch(train_loss, OUT_DIR / f"{tag}_train_loss.png")
+plot_loss_convergence(
+    train_loss, len(train_loader), OUT_DIR / f"{tag}_train_loss_convergence.png",
+    model_name=model_name, dataset=args.dataset,
+)
+#plot_grad_hist(grad_history, OUT_DIR / f"{tag}_grad.png")
