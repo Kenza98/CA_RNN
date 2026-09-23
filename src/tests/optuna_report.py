@@ -5,12 +5,15 @@ read directly from its SQLite storage under optuna/.
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 import optuna
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 OPTUNA_DIR = PROJECT_ROOT / "optuna"
+RESULTS_DIR = PROJECT_ROOT / "results"
+RESULTS_DIR.mkdir(exist_ok=True)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--model", choices=["gru", "lstm", "rnn"], required=True)
@@ -52,3 +55,8 @@ if completed:
     report["best_trial"] = trial_to_dict(study.best_trial)
 
 print(json.dumps(report, indent=2))
+
+out_file = RESULTS_DIR / f"optuna_report_{study_name}.json"
+with open(out_file, "w") as f:
+    json.dump(report, f, indent=2)
+print(f"\nSaved to {out_file}", file=sys.stderr)
