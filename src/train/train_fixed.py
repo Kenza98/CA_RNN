@@ -49,9 +49,9 @@ parser.add_argument("--use-gpu", action="store_true", help="Use GPU if CUDA avai
 parser.add_argument(
     "--seed", type=int, default=42, help="Random seed for reproducibility"
 )
-parser.add_argument("--hidden-dim", type=int, default=28, help="Hidden state size")
+parser.add_argument("--hidden-dim", type=int, default=64, help="Hidden state size")
 parser.add_argument(
-    "--num-layers", type=int, default=5, help="Number of stacked recurrent layers"
+    "--num-layers", type=int, default=1, help="Number of stacked recurrent layers"
 )
 parser.add_argument("--num-epochs", type=int, default=3, help="Training epochs")
 parser.add_argument("--batch-size", type=int, default=256)
