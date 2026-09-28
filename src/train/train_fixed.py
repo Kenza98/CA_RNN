@@ -45,7 +45,7 @@ parser.add_argument(
     required=True,
     help="Which experiment-1 dataset to train on",
 )
-parser.add_argument("--use-gpu", action="store_true", help="Use GPU if CUDA available")
+parser.add_argument("--use-gpu", action="store_true", help="Use GPU if CUDA available", default=True)
 parser.add_argument(
     "--seed", type=int, default=42, help="Random seed for reproducibility"
 )
