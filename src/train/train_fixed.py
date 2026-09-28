@@ -56,9 +56,14 @@ parser.add_argument(
 parser.add_argument("--num-epochs", type=int, default=3, help="Training epochs")
 parser.add_argument("--batch-size", type=int, default=512)
 parser.add_argument("--lr", type=float, default=1e-4)
+parser.add_argument("--folder-name", type=str, help="Give a petit nom to the folder")
 args = parser.parse_args()
 
 set_seed(args.seed)
+if args.folder_name:
+    MODEL_DIR = MODEL_DIR / args.folder_name
+    MODEL_DIR.mkdir(parents=True, exist_ok=True)
+
 
 device = torch.device("cuda" if (args.use_gpu and torch.cuda.is_available()) else "cpu")
 print(f"Using device: {device}", flush=True)
