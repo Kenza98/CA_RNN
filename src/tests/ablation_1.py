@@ -28,8 +28,10 @@ from src.models.VanillaRNN import VanillaRNN
 from src.utils.normalize import normalize
 from src.utils.evaluate import evaluate_model
 
+#\\TODO add args --folder-name
+
 DATA_DIR = PROJECT_ROOT / "data"
-MODEL_DIR = PROJECT_ROOT / "models"
+MODEL_DIR = PROJECT_ROOT / "models" / "final_training_28"
 RESULTS_DIR = PROJECT_ROOT / "results"
 RESULTS_DIR.mkdir(exist_ok=True)
 
@@ -139,6 +141,7 @@ for dataset in DATASETS:
 
         # load the model checkpoint
         checkpoint = torch.load(model_file, map_location="cpu", weights_only=False)
+
         # get hyperparams from checkpoint
         hidden_dim = checkpoint["hidden_dim"]
         num_layers = checkpoint["num_layers"]
@@ -168,9 +171,10 @@ for dataset in DATASETS:
         )
         model.load_state_dict(checkpoint[STATE_DICT_KEYS[model_key]])
 
-        # normalize and standardize the results with checkpoint stored stats
+        # normalize and standardize the testset data
         X, Y = normalize(X_test, Y_test, global_mean, global_std)
-        test_loader = DataLoader(TensorDataset(X, Y), batch_size=256, shuffle=False)
+        #prepare the test dataloader
+        test_loader = DataLoader(TensorDataset(X, Y), batch_size=512, shuffle=False)
 
         # get test metrics by calling utils evaluate_model
         metrics = evaluate_model(model, test_loader, device)  # still standardized
@@ -181,7 +185,7 @@ for dataset in DATASETS:
         mae = mae * global_std
         rmse = mse**0.5
         print(
-            f"- - - >> MSE = {mse:.6f} °C²\n >> RMSE = {rmse:.6f} °C\n >> MAE = {mae:.6f} °C \n"
+            f"MSE = {mse:.6f} °C²\nRMSE = {rmse:.6f} °C\nMAE = {mae:.6f} °C\n\n"
         )
 
         results.setdefault(dataset, {})[model_key] = {
@@ -192,7 +196,8 @@ for dataset in DATASETS:
 
 suffix = f"_{args.model}" if args.model else ""
 suffix += f"_{args.run_id}" if args.run_id else ""
-print(f"\n\n {suffix} \n\n")
+print(suffix)
+
 with open(RESULTS_DIR / f"ablation_1{suffix}.json", "w") as f:
     json.dump({"hyperparams": hyperparams, "test results": results}, f, indent=2)
 
