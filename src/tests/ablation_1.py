@@ -150,18 +150,13 @@ for dataset in DATASETS:
         global_mean = checkpoint["global_mean"]
         global_std = checkpoint["global_std"]
 
-        current = {
+        hyperparams.setdefault(dataset, {})[model_key] = {
             "hidden_dim": hidden_dim,
             "num_layers": num_layers,
             "lr": lr,
             "seed": seed,
         }
-        if hyperparams and hyperparams != current:
-            # this should only go off if hyperparams had values and changed
-            print(f"Warning: {model_key}/{dataset} hyperparams differ: {current}")
-
-        hyperparams = current
-
+        
         # load the model from input_dim, hidden_dim, output_dim, num_layers
         model = model_class(
             input_dim,
