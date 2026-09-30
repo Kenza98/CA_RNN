@@ -150,7 +150,7 @@ for dataset in DATASETS:
         global_mean = checkpoint["global_mean"]
         global_std = checkpoint["global_std"]
 
-        hyperparams.setdefault(dataset, {})[model_key] = {
+        hyperparams = {
             "hidden_dim": hidden_dim,
             "num_layers": num_layers,
             "lr": lr,
@@ -184,9 +184,10 @@ for dataset in DATASETS:
         )
 
         results.setdefault(dataset, {})[model_key] = {
+            "hyperparams": hyperparams, 
             "mse": mse,
             "rmse": rmse,
-            "mae": mae,
+            "mae": mae
         }
 
 suffix = f"_{args.model}" if args.model else ""
@@ -194,7 +195,7 @@ suffix += f"_{args.run_id}" if args.run_id else ""
 print(suffix)
 
 with open(RESULTS_DIR / f"ablation_1{suffix}.json", "w") as f:
-    json.dump({"hyperparams": hyperparams, "test results": results}, f, indent=2)
+    json.dump({"test results": results}, f, indent=2)
 
 _stop_monitor.set()
 monitor_thread.join(timeout=1)
