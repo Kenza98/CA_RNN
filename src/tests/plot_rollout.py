@@ -2,16 +2,18 @@
 
 Two plots from the same file:
 - ``plot_all_starts``: mean over all starts at each step, with the 25-75 percentile band.
-- ``plot_single_start``: the curve of one start (``--start``).
+- ``plot_single_start``: the curve of one start (``--start N``, or ``--single-start`` for a random one).
 ``--baseline`` adds the neighbour-average rollout in grey, behind the model.
 
 Usage:
     python -m src.tests.plot_rollout outputs/ca_results/rollout_errors/<file>.json --metric rmse --baseline
     python -m src.tests.plot_rollout outputs/ca_results/rollout_errors/<file>.json --metric mae --start 30
+    python -m src.tests.plot_rollout outputs/ca_results/rollout_errors/<file>.json --metric mae --single-start
 """
 
 import argparse
 import json
+import random
 from pathlib import Path
 
 import matplotlib
@@ -128,7 +130,10 @@ def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("errors_file", type=Path, help="JSON written by compute_rollout_errors.py")
     p.add_argument("--metric", default="mae", choices=list(UNITS))
-    p.add_argument("--start", type=int, default=None, help="Plot this single start instead of the mean over starts")
+    # --start N plots that start, --single-start plots a random one; not both
+    which_start = p.add_mutually_exclusive_group()
+    which_start.add_argument("--start", type=int, default=None, help="Plot this single start instead of the mean over starts")
+    which_start.add_argument("--single-start", action="store_true", help="Plot one start picked at random from the file")
     p.add_argument("--baseline", action="store_true", help="Also plot the neighbour-average rollout, in grey")
     p.add_argument("--out", type=Path, default=None, help="Output .png (default: next to the errors file)")
     return p.parse_args()
@@ -139,8 +144,14 @@ def main():
     with open(args.errors_file) as f:
         result = json.load(f)
 
-    # a file with a single start has no mean to plot: plot that start
     start = args.start
+
+    # random start among the ones in the file; printed so the plot can be redone with --start
+    if args.single_start:
+        start = random.choice(result["starts"])
+        print(f"Random start: {start}")
+
+    # a file with a single start has no mean to plot: plot that start
     if start is None and len(result["starts"]) == 1:
         start = result["starts"][0]
 
