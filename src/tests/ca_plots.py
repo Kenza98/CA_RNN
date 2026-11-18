@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-OUT_DIR = PROJECT_ROOT / "outputs" / "ca_results"
+OUT_DIR = PROJECT_ROOT / "outputs" / "ca_results" / "v1_baseline"  # legacy, see src/tests/README.md
 
 with open(OUT_DIR / "ca_errors.json") as f:
     results = json.load(f)

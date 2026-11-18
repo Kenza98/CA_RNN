@@ -78,10 +78,13 @@ def download_split(
 
 
 def main():
+    """
     args = parse_args()
     for split_name, (sd, ed) in SPLITS.items():
         download_split(split_name, sd, ed, force=args.force)
-
+    """
+    ds = xr.open_dataset("data/raw/sst_test.nc")
+    print(ds.time.min().values, ds.time.max().values, ds.sizes["time"])
 
 if __name__ == "__main__":
     main()

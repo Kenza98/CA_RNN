@@ -4,7 +4,7 @@ import datetime
 import json
 from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-OUT_DIR = PROJECT_ROOT / "outputs" / "ca_results"
+OUT_DIR = PROJECT_ROOT / "outputs" / "ca_results" / "v1_baseline"  # legacy, see src/tests/README.md
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 DATA_DIR = PROJECT_ROOT / "data"
 MODEL_DIR = PROJECT_ROOT / "models"
