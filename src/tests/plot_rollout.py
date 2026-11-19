@@ -1,9 +1,12 @@
-"""Plot the rollout errors saved by ``compute_rollout_errors.py``, as MAE, RMSE or MSE.
+"""Plot the rollout errors saved by ``compute_rollout_errors.py``, as MAE, RMSE or MSE, for the thesis.
 
 Two plots from the same file:
-- ``plot_all_starts``: mean over all starts at each step, with the 25-75 percentile band.
+- ``plot_all_starts``: across all starts, at each step: mean, median, interquartile range and min-max range.
 - ``plot_single_start``: the curve of one start (``--start N``, or ``--single-start`` for a random one).
-``--baseline`` adds the neighbour-average rollout in grey, behind the model.
+``--baseline`` adds the neighbour-average rollout in grey; ``--col`` sets the model colour.
+
+Figures have no title (the caption is written in LaTeX) and use Computer Modern, LaTeX's default font.
+Each figure is saved as .pdf (vector, for LaTeX) and .png.
 
 Usage:
     python -m src.tests.plot_rollout outputs/ca_results/rollout_errors/<file>.json --metric rmse --baseline
@@ -22,16 +25,50 @@ matplotlib.use("Agg")  # no display needed, e.g. on the cluster
 import matplotlib.pyplot as plt
 import torch
 
-UNITS = {"mae": "°C", "rmse": "°C", "mse": "°C²"}
+# axis labels, in mathtext so the degree sign is drawn in Computer Modern too
+Y_LABELS = {
+    "mae": r"MAE ($^{\circ}$C)",
+    "rmse": r"RMSE ($^{\circ}$C)",
+    "mse": r"MSE ($^{\circ}$C$^{2}$)",
+}
 
-# model in pink, baseline in grey (drawn behind)
-MODEL_COLOR = "#d55181"
-BASELINE_COLOR = "#a3a29b"
+# model colour, chosen with --col (pink by default); baseline in grey
+MODEL_COLORS = {
+    "pink": "#d55181",
+    "yellow": "#cf9f1f",     # mustard
+    "turquoise": "#1b9db3",  # turquoise blue
+    "duck": "#0b6b66",       # duck green
+}
+BASELINE_COLOR = "#8c8b85"
 
-# text, axes and grid colours
+# axes and grid colours
 INK = "#1f1f1e"
-MUTED = "#6b6a64"
-GRID = "#e4e3de"
+GRID = "#e6e5e0"
+
+# about the text width of an A4 thesis page, so 10 pt text stays 10 pt once included
+FIGSIZE = (5.9, 3.4)
+
+THESIS_STYLE = {
+    # Computer Modern, bundled with matplotlib, so no LaTeX install is needed
+    "font.family": "serif",
+    "font.serif": ["cmr10"],
+    "mathtext.fontset": "cm",
+    "axes.formatter.use_mathtext": True,  # cmr10 has no minus sign, mathtext does
+    "axes.unicode_minus": False,
+    "font.size": 10,
+    "axes.labelsize": 10,
+    "xtick.labelsize": 9,
+    "ytick.labelsize": 9,
+    "legend.fontsize": 9,
+    "axes.edgecolor": INK,
+    "axes.labelcolor": INK,
+    "xtick.color": INK,
+    "ytick.color": INK,
+    "axes.linewidth": 0.8,
+    "savefig.dpi": 300,
+    "savefig.bbox": "tight",
+    "pdf.fonttype": 42,  # embed fonts as TrueType, so the PDF text stays selectable
+}
 
 
 def metric_values(result, name, metric):
@@ -43,73 +80,83 @@ def metric_values(result, name, metric):
     return torch.tensor(result["errors"][name][metric])
 
 
-def curves_to_plot(result, metric, baseline):
-    """List of (label, color, values). The baseline comes first, so it is drawn behind the model."""
-    curves = []
-    if baseline:
-        baseline_values = metric_values(result, "neighbour_average", metric)
-        curves.append(("Neighbour average", BASELINE_COLOR, baseline_values))
-
-    model_values = metric_values(result, "model", metric)
-    curves.append((result["model_label"], MODEL_COLOR, model_values))
-    return curves
+def new_figure():
+    plt.rcParams.update(THESIS_STYLE)
+    return plt.subplots(figsize=FIGSIZE)
 
 
-def draw_line(ax, steps, values, label, color, zorder):
-    """The curve, with its last value written at the end of the line."""
-    ax.plot(steps, values, color=color, linewidth=2, label=label, zorder=zorder)
-    ax.annotate(
-        f"{values[-1]:.2f}",
-        (steps[-1], values[-1]),
-        xytext=(6, 0),
-        textcoords="offset points",
-        va="center",
-        fontsize=8,
-        color=INK,
-    )
-
-
-def style_and_save(fig, ax, metric, title, n_steps, out_path):
-    """Axes, labels and legend shared by both plots, then save the figure."""
-    ax.set_xlabel("Rollout step (days)", color=INK)
-    ax.set_ylabel(f"{metric.upper()} ({UNITS[metric]})", color=INK)
-    ax.set_title(title, fontsize=10, color=INK, loc="left")
+def style_and_save(fig, ax, metric, n_steps, legend_items, out_path):
+    """Axes shared by both plots, legend from (handle, label) pairs in the given order,
+    then save as .pdf and .png. Returns the two paths."""
+    ax.set_xlabel("Rollout step (days)")
+    ax.set_ylabel(Y_LABELS[metric])
 
     ax.set_xlim(1, n_steps)
     ax.set_ylim(bottom=0)
-    ax.grid(axis="y", color=GRID, linewidth=0.8)
+    ax.grid(axis="y", color=GRID, linewidth=0.6)
+    ax.set_axisbelow(True)
 
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
-    ax.spines["left"].set_color(MUTED)
-    ax.spines["bottom"].set_color(MUTED)
-    ax.tick_params(colors=MUTED, labelsize=8)
 
-    ax.legend(frameon=False, fontsize=8, loc="upper left")
-    fig.tight_layout()
-    fig.savefig(out_path)
+    handles = [handle for handle, _ in legend_items]
+    labels = [label for _, label in legend_items]
+    ax.legend(handles, labels, frameon=False, loc="upper left")
+
+    pdf_path = Path(out_path).with_suffix(".pdf")
+    png_path = Path(out_path).with_suffix(".png")
+    fig.savefig(pdf_path)
+    fig.savefig(png_path)
     plt.close(fig)
+    return pdf_path, png_path
 
 
-def plot_all_starts(result, metric, out_path, baseline=False):
-    """Mean over starts at each step, with the 25-75 percentile band across starts."""
+def plot_all_starts(result, metric, out_path, baseline=False, color=MODEL_COLORS["pink"]):
+    """Across all starts, at each step: mean, median, interquartile range and min-max range."""
     steps = torch.arange(1, result["n_steps"] + 1)
-    fig, ax = plt.subplots(figsize=(6.4, 4.0), dpi=200)
+    values = metric_values(result, "model", metric)
 
-    for z, (label, color, values) in enumerate(curves_to_plot(result, metric, baseline)):
-        q25 = values.quantile(0.25, dim=0)
-        q75 = values.quantile(0.75, dim=0)
+    fig, ax = new_figure()
 
-        # bands at zorder < 10 and lines at zorder >= 10: no band covers a line
-        ax.fill_between(steps, q25, q75, color=color, alpha=0.18, linewidth=0, zorder=z)
-        draw_line(ax, steps, values.mean(dim=0), label, color, zorder=10 + z)
+    # bands first, lightest at the back, then the lines on top
+    span = ax.fill_between(
+        steps,
+        values.min(dim=0).values,
+        values.max(dim=0).values,
+        color=color,
+        alpha=0.10,
+        linewidth=0,
+    )
+    quartiles = ax.fill_between(
+        steps,
+        values.quantile(0.25, dim=0),
+        values.quantile(0.75, dim=0),
+        color=color,
+        alpha=0.28,
+        linewidth=0,
+    )
 
-    n_starts = len(result["starts"])
-    title = f"Rollout {metric.upper()} on the test set (mean over {n_starts} starts, band = 25-75th pct)"
-    style_and_save(fig, ax, metric, title, result["n_steps"], out_path)
+    legend_items = []
+    if baseline:
+        baseline_mean = metric_values(result, "neighbour_average", metric).mean(dim=0)
+        (baseline_line,) = ax.plot(steps, baseline_mean, color=BASELINE_COLOR, linewidth=1.4)
+
+    (median_line,) = ax.plot(steps, values.median(dim=0).values, color=color, linewidth=1.4, linestyle="--")
+    (mean_line,) = ax.plot(steps, values.mean(dim=0), color=color, linewidth=1.8)
+
+    legend_items = [
+        (mean_line, "Mean"),
+        (median_line, "Median"),
+        (quartiles, "Interquartile range"),
+        (span, "Min-max range"),
+    ]
+    if baseline:
+        legend_items.append((baseline_line, "Neighbour average (mean)"))
+
+    return style_and_save(fig, ax, metric, result["n_steps"], legend_items, out_path)
 
 
-def plot_single_start(result, metric, start, out_path, baseline=False):
+def plot_single_start(result, metric, start, out_path, baseline=False, color=MODEL_COLORS["pink"]):
     """The rollout curve of one start."""
     if start not in result["starts"]:
         first, last = result["starts"][0], result["starts"][-1]
@@ -117,25 +164,35 @@ def plot_single_start(result, metric, start, out_path, baseline=False):
 
     row = result["starts"].index(start)
     steps = torch.arange(1, result["n_steps"] + 1)
-    fig, ax = plt.subplots(figsize=(6.4, 4.0), dpi=300)
 
-    for z, (label, color, values) in enumerate(curves_to_plot(result, metric, baseline)):
-        draw_line(ax, steps, values[row], label, color, zorder=10 + z)
+    fig, ax = new_figure()
+    legend_items = []
 
-    title = f"Rollout {metric.upper()} on the test set (start {start})"
-    style_and_save(fig, ax, metric, title, result["n_steps"], out_path)
+    if baseline:
+        baseline_values = metric_values(result, "neighbour_average", metric)[row]
+        (baseline_line,) = ax.plot(steps, baseline_values, color=BASELINE_COLOR, linewidth=1.4)
+
+    model_values = metric_values(result, "model", metric)[row]
+    (model_line,) = ax.plot(steps, model_values, color=color, linewidth=1.8)
+
+    legend_items.append((model_line, result["model_label"]))
+    if baseline:
+        legend_items.append((baseline_line, "Neighbour average"))
+
+    return style_and_save(fig, ax, metric, result["n_steps"], legend_items, out_path)
 
 
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("errors_file", type=Path, help="JSON written by compute_rollout_errors.py")
-    p.add_argument("--metric", default="mae", choices=list(UNITS))
+    p.add_argument("--metric", default="mae", choices=list(Y_LABELS))
     # --start N plots that start, --single-start plots a random one; not both
     which_start = p.add_mutually_exclusive_group()
-    which_start.add_argument("--start", type=int, default=None, help="Plot this single start instead of the mean over starts")
+    which_start.add_argument("--start", type=int, default=None, help="Plot this single start instead of all starts")
     which_start.add_argument("--single-start", action="store_true", help="Plot one start picked at random from the file")
+    p.add_argument("--col", default="pink", choices=list(MODEL_COLORS), help="Colour of the model's curves and bands")
     p.add_argument("--baseline", action="store_true", help="Also plot the neighbour-average rollout, in grey")
-    p.add_argument("--out", type=Path, default=None, help="Output .png (default: next to the errors file)")
+    p.add_argument("--out", type=Path, default=None, help="Output path, saved as .pdf and .png (default: next to the errors file)")
     return p.parse_args()
 
 
@@ -151,22 +208,22 @@ def main():
         start = random.choice(result["starts"])
         print(f"Random start: {start}")
 
-    # a file with a single start has no mean to plot: plot that start
+    # a file with a single start has no spread to plot: plot that start
     if start is None and len(result["starts"]) == 1:
         start = result["starts"][0]
 
     if args.out is not None:
         out_path = args.out
     else:
-        which = f"start{start}" if start is not None else "mean"
-        out_path = args.errors_file.with_name(f"{args.errors_file.stem}_{args.metric}_{which}.png")
+        which = f"start{start}" if start is not None else "allstarts"
+        out_path = args.errors_file.with_name(f"{args.errors_file.stem}_{args.metric}_{which}")
 
     if start is not None:
-        plot_single_start(result, args.metric, start, out_path, args.baseline)
+        pdf_path, png_path = plot_single_start(result, args.metric, start, out_path, args.baseline, MODEL_COLORS[args.col])
     else:
-        plot_all_starts(result, args.metric, out_path, args.baseline)
+        pdf_path, png_path = plot_all_starts(result, args.metric, out_path, args.baseline, MODEL_COLORS[args.col])
 
-    print(f"Saved to {out_path}")
+    print(f"Saved to {pdf_path} and {png_path}")
 
 
 if __name__ == "__main__":
