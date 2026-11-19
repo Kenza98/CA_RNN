@@ -3,15 +3,15 @@
 Two plots from the same file:
 - ``plot_all_starts``: across all starts, at each step: mean, median, interquartile range and min-max range.
 - ``plot_single_start``: the curve of one start (``--start N``, or ``--single-start`` for a random one).
-``--baseline`` adds the neighbour-average rollout in grey; ``--col`` sets the model colour.
+``--baseline average|persistence`` adds that baseline in grey; ``--col`` sets the model colour.
 
 Figures have no title (the caption is written in LaTeX) and use Computer Modern, LaTeX's default font.
 Each figure is saved as .pdf (vector, for LaTeX) and .png.
 
 Usage:
-    python -m src.tests.plot_rollout outputs/ca_results/rollout_errors/<file>.json --metric rmse --baseline
+    python -m src.tests.plot_rollout outputs/ca_results/rollout_errors/<file>.json --metric rmse --baseline average
     python -m src.tests.plot_rollout outputs/ca_results/rollout_errors/<file>.json --metric mae --start 30
-    python -m src.tests.plot_rollout outputs/ca_results/rollout_errors/<file>.json --metric mae --single-start
+    python -m src.tests.plot_rollout outputs/ca_results/rollout_errors/<file>.json --metric mae --single-start --baseline persistence
 """
 
 import argparse
@@ -40,6 +40,12 @@ MODEL_COLORS = {
     "duck": "#0b6b66",       # duck green
 }
 BASELINE_COLOR = "#8c8b85"
+
+# --baseline choice -> (key in the errors file, legend label)
+BASELINES = {
+    "average": ("neighbour_average", "Neighbour average"),
+    "persistence": ("persistence", "Persistence"),
+}
 
 # axes and grid colours
 INK = "#1f1f1e"
@@ -72,8 +78,10 @@ THESIS_STYLE = {
 
 
 def metric_values(result, name, metric):
-    """(n_starts, n_steps) tensor of ``metric`` for ``name`` ("model" or "neighbour_average").
+    """(n_starts, n_steps) tensor of ``metric`` for ``name`` ("model", "neighbour_average" or "persistence").
     MSE is each rollout's RMSE squared."""
+    if name not in result["errors"]:
+        raise KeyError(f"No '{name}' errors in this file: recompute it with compute_rollout_errors.py")
     if metric == "mse":
         rmse = torch.tensor(result["errors"][name]["rmse"])
         return rmse**2
@@ -111,8 +119,9 @@ def style_and_save(fig, ax, metric, n_steps, legend_items, out_path):
     return pdf_path, png_path
 
 
-def plot_all_starts(result, metric, out_path, baseline=False, color=MODEL_COLORS["pink"]):
-    """Across all starts, at each step: mean, median, interquartile range and min-max range."""
+def plot_all_starts(result, metric, out_path, baseline=None, color=MODEL_COLORS["pink"]):
+    """Across all starts, at each step: mean, median, interquartile range and min-max range.
+    ``baseline`` ("average", "persistence" or None) adds that baseline's mean in grey."""
     steps = torch.arange(1, result["n_steps"] + 1)
     values = metric_values(result, "model", metric)
 
@@ -136,9 +145,9 @@ def plot_all_starts(result, metric, out_path, baseline=False, color=MODEL_COLORS
         linewidth=0,
     )
 
-    legend_items = []
-    if baseline:
-        baseline_mean = metric_values(result, "neighbour_average", metric).mean(dim=0)
+    if baseline is not None:
+        baseline_key, baseline_label = BASELINES[baseline]
+        baseline_mean = metric_values(result, baseline_key, metric).mean(dim=0)
         (baseline_line,) = ax.plot(steps, baseline_mean, color=BASELINE_COLOR, linewidth=1.4)
 
     (median_line,) = ax.plot(steps, values.median(dim=0).values, color=color, linewidth=1.4, linestyle="--")
@@ -150,13 +159,13 @@ def plot_all_starts(result, metric, out_path, baseline=False, color=MODEL_COLORS
         (quartiles, "Interquartile range"),
         (span, "Min-max range"),
     ]
-    if baseline:
-        legend_items.append((baseline_line, "Neighbour average (mean)"))
+    if baseline is not None:
+        legend_items.append((baseline_line, f"{baseline_label} (mean)"))
 
     return style_and_save(fig, ax, metric, result["n_steps"], legend_items, out_path)
 
 
-def plot_single_start(result, metric, start, out_path, baseline=False, color=MODEL_COLORS["pink"]):
+def plot_single_start(result, metric, start, out_path, baseline=None, color=MODEL_COLORS["pink"]):
     """The rollout curve of one start."""
     if start not in result["starts"]:
         first, last = result["starts"][0], result["starts"][-1]
@@ -168,16 +177,17 @@ def plot_single_start(result, metric, start, out_path, baseline=False, color=MOD
     fig, ax = new_figure()
     legend_items = []
 
-    if baseline:
-        baseline_values = metric_values(result, "neighbour_average", metric)[row]
+    if baseline is not None:
+        baseline_key, baseline_label = BASELINES[baseline]
+        baseline_values = metric_values(result, baseline_key, metric)[row]
         (baseline_line,) = ax.plot(steps, baseline_values, color=BASELINE_COLOR, linewidth=1.4)
 
     model_values = metric_values(result, "model", metric)[row]
     (model_line,) = ax.plot(steps, model_values, color=color, linewidth=1.8)
 
     legend_items.append((model_line, result["model_label"]))
-    if baseline:
-        legend_items.append((baseline_line, "Neighbour average"))
+    if baseline is not None:
+        legend_items.append((baseline_line, baseline_label))
 
     return style_and_save(fig, ax, metric, result["n_steps"], legend_items, out_path)
 
@@ -191,7 +201,7 @@ def parse_args():
     which_start.add_argument("--start", type=int, default=None, help="Plot this single start instead of all starts")
     which_start.add_argument("--single-start", action="store_true", help="Plot one start picked at random from the file")
     p.add_argument("--col", default="pink", choices=list(MODEL_COLORS), help="Colour of the model's curves and bands")
-    p.add_argument("--baseline", action="store_true", help="Also plot the neighbour-average rollout, in grey")
+    p.add_argument("--baseline", default=None, choices=list(BASELINES), help="Also plot this baseline, in grey")
     p.add_argument("--out", type=Path, default=None, help="Output path, saved as .pdf and .png (default: next to the errors file)")
     return p.parse_args()
 
@@ -216,7 +226,10 @@ def main():
         out_path = args.out
     else:
         which = f"start{start}" if start is not None else "allstarts"
-        out_path = args.errors_file.with_name(f"{args.errors_file.stem}_{args.metric}_{which}")
+        name = f"{args.errors_file.stem}_{args.metric}_{which}"
+        if args.baseline is not None:
+            name += f"_{args.baseline}"
+        out_path = args.errors_file.with_name(name)
 
     if start is not None:
         pdf_path, png_path = plot_single_start(result, args.metric, start, out_path, args.baseline, MODEL_COLORS[args.col])

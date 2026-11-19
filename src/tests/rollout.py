@@ -11,7 +11,8 @@ Contents:
 - Fill functions, for those unpredicted sea cells, before the grid is fed back:
   ``fill_with_ground_truth`` (real values) and ``fill_with_neighbour_mean`` (no real values).
 - Rollouts: ``rollout_ca_rnn`` (RNN + CA), ``rollout_rnn`` (RNN without CA),
-  ``rollout_neighbour_average`` (baseline, no model). \\TODO ``rollout_ffnn``.
+  ``rollout_neighbour_average`` and ``rollout_persistence`` (baselines, no model).
+  \\TODO ``rollout_ffnn``.
 - Errors: ``errors_per_step``, on the cells the model predicted only.
 
 To run the rollouts and plot their errors, see ``compute_rollout_errors.py`` and ``plot_rollout.py``.
@@ -260,6 +261,32 @@ def rollout_neighbour_average(sst_series, fill_fn, start=0, n_steps=30, seq_leng
     """
     return rollout_ca_rnn(
         NeighbourAverage(),
+        sst_series,
+        mean=0.0,
+        std=1.0,
+        fill_fn=fill_fn,
+        start=start,
+        n_steps=n_steps,
+        seq_length=seq_length,
+    )
+
+
+class Persistence(torch.nn.Module):
+    """Model-free rule: a cell's next value is its own value in the last frame.
+    Takes ``extract_neighborhood`` input (n_cells, seq_length, 9); index 4 is the centre cell."""
+
+    def forward(self, x):
+        return x[:, -1, 4:5]
+
+
+def rollout_persistence(sst_series, fill_fn, start=0, n_steps=30, seq_length=SEQ_LENGTH):
+    """Baseline rollout: each step repeats the previous grid (on the predicted cells).
+
+    Runs through ``rollout_ca_rnn``, so it uses the same seed, cells and fill as the model.
+    Returns (preds, truth, predicted_masks), as ``rollout_ca_rnn``.
+    """
+    return rollout_ca_rnn(
+        Persistence(),
         sst_series,
         mean=0.0,
         std=1.0,

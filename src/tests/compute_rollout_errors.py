@@ -1,7 +1,7 @@
 """Run the rollouts of a checkpoint on the test set and save their errors, per start and per step.
 
-Runs the model's rollout (``nca``: with CA, ``nn``: without CA) and the neighbour-average
-baseline from every start (or one, with ``--start``), and saves MAE and RMSE to a JSON file.
+Runs the model's rollout (``nca``: with CA, ``nn``: without CA) and the two baselines
+(neighbour average and persistence) from every start (or one, with ``--start``), and saves MAE and RMSE to a JSON file.
 ``plot_rollout.py`` plots that file.
 
 Usage:
@@ -23,6 +23,7 @@ from src.tests.rollout import (
     load_sst_series,
     rollout_ca_rnn,
     rollout_neighbour_average,
+    rollout_persistence,
     rollout_rnn,
 )
 
@@ -34,10 +35,10 @@ ERRORS_DIR = OUT_DIR / "rollout_errors"
 
 
 def compute_rollout_errors(checkpoint, fill="neighbour_mean", start=None, n_steps=30, seq_length=SEQ_LENGTH):
-    """Errors of the model and of the neighbour-average baseline, from one start or from all of them.
+    """Errors of the model and of the two baselines, from one start or from all of them.
 
     Returns a JSON-ready dict. ``errors[name][metric]`` is a list over starts of lists over steps,
-    with name "model" or "neighbour_average" and metric "mae" or "rmse".
+    with name "model", "neighbour_average" or "persistence" and metric "mae" or "rmse".
     """
     model, mean, std, meta = load_checkpoint(checkpoint, "cpu")
     dataset = meta["dataset"]
@@ -57,17 +58,26 @@ def compute_rollout_errors(checkpoint, fill="neighbour_mean", start=None, n_step
     errors = {
         "model": {"mae": [], "rmse": []},
         "neighbour_average": {"mae": [], "rmse": []},
+        "persistence": {"mae": [], "rmse": []},
     }
 
     for s in starts:
         model_run = model_rollout(
             model, sst, mean, std, fill_fn, start=s, n_steps=n_steps, seq_length=seq_length
         )
-        baseline_run = rollout_neighbour_average(
+        average_run = rollout_neighbour_average(
+            sst, fill_fn, start=s, n_steps=n_steps, seq_length=seq_length
+        )
+        persistence_run = rollout_persistence(
             sst, fill_fn, start=s, n_steps=n_steps, seq_length=seq_length
         )
 
-        for name, (preds, truth, masks) in [("model", model_run), ("neighbour_average", baseline_run)]:
+        runs = {
+            "model": model_run,
+            "neighbour_average": average_run,
+            "persistence": persistence_run,
+        }
+        for name, (preds, truth, masks) in runs.items():
             step_errors = errors_per_step(preds, truth, masks)
             errors[name]["mae"].append(step_errors["mae"])
             errors[name]["rmse"].append(step_errors["rmse"])
