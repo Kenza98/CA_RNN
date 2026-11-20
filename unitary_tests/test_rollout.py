@@ -459,6 +459,35 @@ class TestRolloutNeighbourAverage(unittest.TestCase):
         self.assertTrue(torch.equal(masks_baseline, masks_model))
 
 
+class TestRolloutPersistence(unittest.TestCase):
+    def test_module_returns_centre_of_last_frame(self):
+        x = torch.arange(2 * 3 * 9, dtype=torch.float32).view(2, 3, 9)  # (n_cells, seq_length, 9)
+        torch.testing.assert_close(rollout.Persistence()(x), x[:, -1, 4:5])
+
+    def test_repeats_last_seed_frame_on_predicted_cells(self):
+        sst = torch.stack([ramp_grid() + t for t in range(8)])
+        preds, truth, masks = rollout.rollout_persistence(
+            sst, rollout.fill_with_ground_truth, start=1, n_steps=3, seq_length=4
+        )
+        last_seed = sst[4]
+        for k in range(3):
+            torch.testing.assert_close(preds[k][masks[k]], last_seed[masks[k]])
+        torch.testing.assert_close(truth, sst[5:8])
+
+    def test_same_cells_as_neighbour_average(self):
+        sst = torch.stack([ramp_grid() + t for t in range(10)])
+        sst[:, 0, 0] = NAN
+        sst[:, 2, 3] = NAN
+        _, truth_p, masks_p = rollout.rollout_persistence(
+            sst, rollout.fill_with_neighbour_mean, start=1, n_steps=3, seq_length=4
+        )
+        _, truth_a, masks_a = rollout.rollout_neighbour_average(
+            sst, rollout.fill_with_neighbour_mean, start=1, n_steps=3, seq_length=4
+        )
+        torch.testing.assert_close(truth_p, truth_a, equal_nan=True)
+        self.assertTrue(torch.equal(masks_p, masks_a))
+
+
 class TestErrorsPerStep(unittest.TestCase):
     def test_masked_mae_rmse(self):
         truth = torch.zeros(2, 2, 2)

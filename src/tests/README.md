@@ -10,14 +10,17 @@ prediction back in, and repeats (30 steps by default).
 
 ### Running them
 
-1. `compute_rollout_errors.py` runs the model's rollout and the
-   neighbour-average baseline from every start of the test set (or one, with
+1. `compute_rollout_errors.py` runs the model's rollout and the two
+   baselines (neighbour average, persistence) from every start of the test set (or one, with
    `--start`), and saves MAE and RMSE per start and per step to
    `outputs/ca_results/rollout_errors/<checkpoint>_<fill>_<allstarts|startN>_<MMDD_HHMMSS>.json`.
    The rollout is picked from the checkpoint: `nca` uses the CA framing, `nn` the one without CA.
 2. `plot_rollout.py <errors.json> --metric mae|rmse|mse` plots that file:
    the mean over starts with the 25-75 percentile band, or a single start with
-   `--start N`. `--baseline` adds the neighbour average in grey.
+   `--start N`. `--baseline average|persistence` adds that baseline in grey.
+3. `plot_rollout_comparison.py <errors.json ...> --metric mae|rmse|mse` puts the
+   all-starts mean of several checkpoints on one plot, one plot per framing
+   (`nca`, `nn`), one colour per model type, with `--baseline` in grey.
 
 On the cluster, `slurm/rollout.slurm` runs both one after the other (CPU only;
 set the checkpoint and fill at the top of the script).
@@ -34,6 +37,7 @@ set the checkpoint and fill at the top of the script).
 | `rollout_ca_rnn(...)` | RNN + CA: each cell sees its 3×3 neighbourhood (`extract_neighborhood`) |
 | `rollout_rnn(...)` | RNN without CA: each cell sees its own history (`extract_pointwise`) |
 | `rollout_neighbour_average(...)` | Baseline without a model: each step is the 3×3 mean of the previous grid |
+| `rollout_persistence(...)` | Baseline without a model: each step repeats the previous grid |
 | `errors_per_step` | MAE and RMSE for each step, computed **only on cells the model predicted** |
 
 The cells the model can't predict are the 1-cell outer ring of the grid and
