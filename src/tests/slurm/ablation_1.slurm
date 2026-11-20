@@ -3,14 +3,14 @@
 ##SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=8G
-#SBATCH --time=01:00:00
+#SBATCH --time=02:00:00
 #SBATCH --partition=turing-wide
 #SBATCH --output=src/tests/slurm/runs/ablation_1_%j.out
 #SBATCH --error=src/tests/slurm/runs/ablation_1_%j.err
 
 #activate my env
 source ~/.bashrc
-
 conda activate carnn_venv
 
-python -m src.tests.ablation_1 --model lstm --run-id gpu_102064
+python -m src.tests.ablation_1 --run-id gpu_108324
+
