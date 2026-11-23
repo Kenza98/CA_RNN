@@ -1,14 +1,13 @@
 """Plotting CA rollout to compare checkpoints.
 Mean error over all starts of each model on the same plot.
 
-Takes several files written by ``compute_rollout_errors.py`` and makes one plot per framing
-(``nca``: with CA, ``nn``: without CA). Each model type has its own colour (``MODEL_TYPE_COLORS``),
-and ``--baseline average|persistence|all`` adds the baselines' means in grey, one line style each.
-Same style as ``plot_rollout.py``: no title, Computer Modern, saved as .pdf and .png.
+Takes files written by ``compute_rollout_errors.py`` and generates one plot per framing:
+    (``nca``, ``nn``: without CA).
+    Each model type has its own colour (``MODEL_TYPE_COLORS``),
+``--baseline average|persistence|all`` adds the baselines' means (grey)
 
-Usage:
-    python -m src.tests.plot_rollout_comparison outputs/ca_results/rollout_errors/*_ground_truth_allstarts.json \\
-        --metric mae --baseline all
+Usage example:
+    python -m src.tests.plot_rollout_comparison outputs/ca_results/rollout_errors/*_ground_truth_allstarts.json --metric rmse --baseline all
 """
 
 import argparse

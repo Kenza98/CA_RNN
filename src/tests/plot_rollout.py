@@ -51,11 +51,12 @@ BASELINE_CHOICES = [*BASELINES, "all"]
 
 
 def resolve_baselines(choices):
-    """--baseline values -> baseline names, in BASELINES order, without repeats; "all" is every baseline."""
+    """--baseline values -> baseline names, in BASELINES order, without repeats;"all" is every baseline."""
     if not choices:
-        return []
+        return [] # No baselines arg, doesn't plot baselines
     if "all" in choices:
-        return list(BASELINES)
+        return list(BASELINES) #if "all" is listed or is the only arg, show all
+    # Finally reorder requested baselines and remove repeats
     return [name for name in BASELINES if name in choices]
 
 
