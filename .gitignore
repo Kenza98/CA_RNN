@@ -21,10 +21,15 @@ logs/
 # batch files
 *.save
 *.save.*
-*.slurm
+
 
 # Any test runs output directories
 runs/
 */runs/
 
+# Plots
+outputs/*.png
+outputs/*.pdf
 
+# database files
+*.db
