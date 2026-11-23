@@ -17,24 +17,26 @@ conda activate carnn_venv
 set -euo pipefail
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 
-FILL=ground_truth  #neighbour_mean
+
 ERRORS_DIR=outputs/ca_results/rollout_errors
-ERRORS_FILES=("$ERRORS_DIR"/*_${FILL}_allstarts.json)
 PLOTS=outputs/rollout_plots
-METRICS=(mae rmse)
 
 mkdir -p "$PLOTS"
 
-# without a match, the glob stays as the literal pattern: stop rather than plot nothing
-if [ ! -e "${ERRORS_FILES[0]}" ]; then
-    echo "No error files matching $ERRORS_DIR/*_${FILL}_allstarts.json" >&2
-    exit 1
-fi
+for FILL in ground_truth neighbour_mean; do
+    ERRORS_FILES=("$ERRORS_DIR"/*_${FILL}_allstarts.json)
 
-echo "Fill: $FILL | ${#ERRORS_FILES[@]} error file(s):"
-printf '  %s\n' "${ERRORS_FILES[@]}"
+    # without a match, the glob stays as the literal pattern: skip this fill rather than plot nothing
+    if [ ! -e "${ERRORS_FILES[0]}" ]; then
+        echo "No error files matching $ERRORS_DIR/*_${FILL}_allstarts.json, skipping $FILL" >&2
+        continue
+    fi
 
-for METRIC in "${METRICS[@]}"; do
-    python -m src.tests.plot_rollout_comparison "${ERRORS_FILES[@]}" \
-        --metric "$METRIC" --baseline all --out-dir "$PLOTS"
+    echo "Fill: $FILL | ${#ERRORS_FILES[@]} error file(s):"
+    printf '  %s\n' "${ERRORS_FILES[@]}"
+
+    for METRIC in mae rmse; do
+        python -m src.tests.plot_rollout_comparison "${ERRORS_FILES[@]}" \
+            --metric "$METRIC" --baseline all --out-dir "$PLOTS"
+    done
 done
