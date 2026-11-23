@@ -21,8 +21,7 @@ FILL=ground_truth  #neighbour_mean
 ERRORS_DIR=outputs/ca_results/rollout_errors
 ERRORS_FILES=("$ERRORS_DIR"/*_${FILL}_allstarts.json)
 PLOTS=outputs/rollout_plots
-METRICS=(mae rmse mse)
-BASELINES=(average persistence)
+METRICS=(mae rmse)
 
 mkdir -p "$PLOTS"
 
@@ -36,8 +35,6 @@ echo "Fill: $FILL | ${#ERRORS_FILES[@]} error file(s):"
 printf '  %s\n' "${ERRORS_FILES[@]}"
 
 for METRIC in "${METRICS[@]}"; do
-    for BASELINE in "${BASELINES[@]}"; do
-        python -m src.tests.plot_rollout_comparison "${ERRORS_FILES[@]}" \
-            --metric "$METRIC" --baseline "$BASELINE" --out-dir "$PLOTS"
-    done
+    python -m src.tests.plot_rollout_comparison "${ERRORS_FILES[@]}" \
+        --metric "$METRIC" --baseline all --out-dir "$PLOTS"
 done

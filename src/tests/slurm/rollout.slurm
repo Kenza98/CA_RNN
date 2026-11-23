@@ -43,10 +43,6 @@ if [ ! -s "$ERRORS" ]; then
 fi
 
 for METRIC in mae rmse mse; do
-    python -m src.tests.plot_rollout "$ERRORS" --metric "$METRIC" --col "$COL" --out "${OUT}_${METRIC}"
-    for BASELINE in average persistence; do
-        python -m src.tests.plot_rollout "$ERRORS" --metric "$METRIC" --col "$COL" --baseline "$BASELINE" --out "${OUT}_${METRIC}_${BASELINE}"
-    done
-
+    python -m src.tests.plot_rollout "$ERRORS" --metric "$METRIC" --col "$COL" --baseline all --out "${OUT}_${METRIC}"
 done
 
