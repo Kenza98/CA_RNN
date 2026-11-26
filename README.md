@@ -77,6 +77,7 @@ Training and evaluation are organized under `src/`:
   produce plots from test outputs.
 - **Hyperparameter search**: Optuna studies are stored in `optuna/` as SQLite
   databases; see `src/tests/optuna_report.py` for generating reports from them.
+- **Experiment 2 (FFNN baseline)**: see `src/train/README_exp2.md`.
 - **SLURM**: batch job scripts for cluster training are under
   `src/train/slurm/` and `src/tests/slurm/`.
 
