@@ -1,5 +1,5 @@
 """
-Report findings from an experiment-1 Optuna study (exp1_{gru,lstm,rnn}.py),
+Report findings from an Optuna study (exp1_{gru,lstm,rnn}.py or exp2_ffnn.py),
 read directly from its SQLite storage under optuna/.
 """
 
@@ -16,11 +16,12 @@ RESULTS_DIR = PROJECT_ROOT / "results"
 RESULTS_DIR.mkdir(exist_ok=True)
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--model", choices=["gru", "lstm", "rnn"], required=True)
+parser.add_argument("--model", choices=["gru", "lstm", "rnn", "ffnn"], required=True)
 parser.add_argument("--dataset", choices=["nca", "nn"], required=True)
+parser.add_argument("--data-tag", default="1", help="Data-file prefix the study was run on (default: experiment-1 data)")
 args = parser.parse_args()
 
-study_name = f"{args.model}_1_{args.dataset}"
+study_name = f"{args.model}_{args.data_tag}_{args.dataset}"
 db_path = OPTUNA_DIR / f"{study_name}.db"
 
 if not db_path.exists():

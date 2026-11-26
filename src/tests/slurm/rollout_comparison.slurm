@@ -39,4 +39,5 @@ for FILL in ground_truth neighbour_mean; do
         python -m src.tests.plot_rollout_comparison "${ERRORS_FILES[@]}" \
             --metric "$METRIC" --baseline all --out-dir "$PLOTS"
     done
+
 done

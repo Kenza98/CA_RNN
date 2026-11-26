@@ -95,3 +95,55 @@ def plot_grad_hist(grad_history, fp):
     fig.tight_layout()
     fig.savefig(fp, dpi=150, bbox_inches="tight")
     plt.close(fig)
+
+
+def plot_train_val_loss(train_epoch_loss, val_epoch_loss, fp, model_name=None, dataset=None):
+    ###
+    # train_epoch_loss : mean training MSE of each epoch
+    # val_epoch_loss : validation MSE measured at the end of each epoch
+    # fp : path to save the figure
+    ###
+    epochs = range(1, len(train_epoch_loss) + 1)
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.plot(epochs, train_epoch_loss, "o-", label="Train MSE (epoch mean)")
+    ax.plot(epochs, val_epoch_loss, "s-", label="Validation MSE (end of epoch)")
+    ax.set_xlabel("Epoch")
+    ax.set_ylabel("MSE Loss")
+    ax.set_xticks(list(epochs))
+    title = "Training vs Validation Loss"
+    if model_name and dataset:
+        title = f"{model_name} on {dataset} — {title}"
+    ax.set_title(title)
+    ax.legend()
+    ax.grid(True, axis="y", alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(fp, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_activation_hist(activations_before, activations_after, fp, model_name=None, dataset=None):
+    ###
+    # activations_before / activations_after : {layer name: 1-D tensor of tanh outputs}
+    #   measured on the same validation batch before and after training
+    # fp : path to save the figure
+    # Shows how many hidden units sit near the saturated ends of tanh (|a| close to 1).
+    ###
+    names = list(activations_after)
+    fig, axes = plt.subplots(1, len(names), figsize=(6 * len(names), 5), squeeze=False)
+    for ax, name in zip(axes[0], names):
+        for label, acts in (("before training", activations_before[name]),
+                            ("after training", activations_after[name])):
+            sat = (acts.abs() > 0.95).float().mean().item()
+            ax.hist(acts.numpy(), bins=100, range=(-1, 1), alpha=0.5, density=True,
+                    label=f"{label} (|a|>0.95: {sat:.1%})")
+        ax.set_xlabel("tanh activation")
+        ax.set_ylabel("Density")
+        ax.set_title(name)
+        ax.legend()
+    title = "Hidden-layer tanh activations"
+    if model_name and dataset:
+        title = f"{model_name} on {dataset} — {title}"
+    fig.suptitle(title)
+    fig.tight_layout()
+    fig.savefig(fp, dpi=150, bbox_inches="tight")
+    plt.close(fig)
